@@ -50,7 +50,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "2. 植入 SukiSU Ultra 驱动与 5.4 内核兼容适配"
+          echo "2. 植入 SukiSU Ultra 驱动与 5.4 接口适配"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
@@ -62,13 +62,12 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
+          # 2) 使用 sed 精准修复 pkg_observer.c 适用于 Linux 5.4 内核
           PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
           if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
-            echo "[+] 使用 Perl 修复 $PKG_OBSERVER"
-            perl -i -pe 'print "#include <linux/version.h>\n" if $. == 1' "$PKG_OBSERVER"
-            perl -i -pe 's/(static const struct fsnotify_ops)/#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)\nstatic int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info)\n{\n    return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie);\n}\n#endif\n$1/' "$PKG_OBSERVER"
-            perl -i -pe 's/\.handle_inode_event = ksu_handle_inode_event,/#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)\n\t.handle_inode_event = ksu_handle_inode_event,\n#else\n\t.handle_event = ksu_handle_event,\n#endif/' "$PKG_OBSERVER"
+            echo "[+] 修复 $PKG_OBSERVER 的 Linux 5.4 fsnotify 接口"
+            sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
+            sed -i 's/\.handle_inode_event = ksu_handle_inode_event,/\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
           fi
 
           echo "========================================"
@@ -146,7 +145,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS + DTS 顶格修复完成！"
+          echo "SukiSU Ultra + SUSFS 集成完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

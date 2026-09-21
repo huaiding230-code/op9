@@ -33,42 +33,56 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "1. 克隆 SukiSU Ultra 官方仓库"
+          echo "1. 克隆 SukiSU Ultra 与 Star-Seven/susfs4ksu"
           echo "========================================"
 
-          rm -rf /tmp/SukiSU-Ultra
+          rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
+          git clone --depth=1 -b kernel-5.4 https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
 
           echo "========================================"
-          echo "2. 植入 KernelSU 基础驱动"
+          echo "2. 植入 SukiSU Ultra 驱动"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
           echo "========================================"
-          echo "3. 提取 SUSFS 源码并打入 VFS 补丁"
+          echo "3. 从 Star-Seven/susfs4ksu 复制核心源码"
           echo "========================================"
 
-          # 1. 复制 susfs.c 和 susfs.h 到内核源码目录
-          find /tmp/SukiSU-Ultra -name "susfs.c" -exec cp {} fs/ \;
-          find /tmp/SukiSU-Ultra -name "susfs.h" -exec cp {} include/linux/ \;
+          # 复制 susfs.c 与 susfs.h 到内核源码树
+          SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
+          SUSFS_H=$(find /tmp/susfs4ksu -name "susfs.h" | head -n 1)
 
-          # 2. 寻找 5.4 内核的 SUSFS patch 并应用
-          SUSFS_PATCH=$(find /tmp/SukiSU-Ultra -type f \( -name "*5.4*.patch" -o -name "*susfs*.patch" \) | head -n 1 || true)
-
-          if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "应用 SUSFS 补丁文件: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || { echo "WARNING: Patch 自动对齐有部分冲突，尝试忽略冲突并继续"; }
+          if [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
+            cp "$SUSFS_C" fs/
+            cp "$SUSFS_H" include/linux/
+            echo "[+] 成功提取并放置 susfs.c 和 susfs.h"
           else
-            echo "未找到独立 patch 文件，直接补全 Makefile 与 Kconfig 引用"
+            echo "ERROR: 在 Star-Seven/susfs4ksu 中未找到 susfs.c 或 susfs.h！"
+            exit 1
           fi
 
-          # 3. 确保 fs/Makefile 包含 susfs.o 编译项
+          echo "========================================"
+          echo "4. 应用 5.4 内核 SUSFS VFS 补丁"
+          echo "========================================"
+
+          # 在 susfs4ksu 中寻找适用于 5.4 内核的 patch 文件
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1)
+
+          if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
+            echo "[+] 找到 5.4 补丁: $SUSFS_PATCH"
+            patch -p1 < "$SUSFS_PATCH" || { echo "WARNING: Patch 对齐存在部分 conflict，将继续编译运行"; }
+          else
+            echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
+          fi
+
+          # 补充 fs/Makefile 编译配置
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
 
-          # 4. 确保 fs/Kconfig 包含 SUSFS 配置
+          # 补充 fs/Kconfig 菜单项
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
             sed -i '/endmenu/d' fs/Kconfig || true
             echo -e 'config KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y' >> fs/Kconfig
@@ -76,7 +90,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "4. 校验 SUSFS 核心文件与挂载点"
+          echo "5. 严格断言（Assert）核心文件"
           echo "========================================"
 
           test -f fs/susfs.c
@@ -84,7 +98,7 @@ jobs:
           test -d drivers/kernelsu
 
           echo "========================================"
-          echo "5. 追加 SUSFS 编译参数到 defconfig"
+          echo "6. 追加 SUSFS 完整编译开关至 defconfig"
           echo "========================================"
 
           CONFIG_LIST="
@@ -111,7 +125,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 准备就绪！"
+          echo "SukiSU Ultra + SUSFS 挂载完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

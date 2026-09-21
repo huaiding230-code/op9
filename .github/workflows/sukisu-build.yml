@@ -62,7 +62,7 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 使用纯 Perl 单行正则修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
+          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
           PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
           if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
             echo "[+] 使用 Perl 修复 $PKG_OBSERVER"
@@ -72,14 +72,23 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 从 susfs4ksu 提取完整核心源码"
+          echo "3. 批量修复所有 OPLUS 机型 Makefile TAB 缩进错误"
+          echo "========================================"
+
+          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
+            echo "[+] 扫描并替换 vendor/oplus 下所有 Makefile 中的空格缩进"
+            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i $'s/^[ ]\{8\}/\t/' {} +
+          fi
+
+          echo "========================================"
+          echo "4. 从 susfs4ksu 提取完整核心源码"
           echo "========================================"
 
           find /tmp/susfs4ksu -name "susfs.c" -exec cp {} fs/ \;
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "4. 应用 5.4 内核 SUSFS VFS 补丁"
+          echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
 
           SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
@@ -100,7 +109,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "5. 严格断言（Assert）核心文件"
+          echo "6. 严格断言（Assert）核心文件"
           echo "========================================"
 
           test -f fs/susfs.c
@@ -110,7 +119,7 @@ jobs:
           test -d drivers/kernelsu
 
           echo "========================================"
-          echo "6. 追加 SUSFS 编译开关至 defconfig"
+          echo "7. 追加 SUSFS 编译开关至 defconfig"
           echo "========================================"
 
           CONFIG_LIST="
@@ -137,7 +146,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 挂载完成！"
+          echo "SukiSU Ultra + SUSFS + 全局 Makefile 修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

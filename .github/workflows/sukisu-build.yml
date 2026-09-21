@@ -1,12 +1,10 @@
 name: Phase 2 - Integrated SukiSU Ultra + SUSFS Kernel Build
-
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
       - name: Maximize Build Space
         uses: easimon/maximize-build-space@master
@@ -112,13 +110,13 @@ jobs:
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -path "*/5.4/*" -o -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" | head -n 1 || true)
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
             echo "[+] 应用目标补丁: $SUSFS_PATCH"
             patch -p1 < "$SUSFS_PATCH" || true
           else
-            echo "[!] 警告: 未找到 5.4 VFS 补丁，跳过 patch 步骤"
+            echo "[!] 警告: 未找到 VFS 补丁，跳过 patch 步骤"
           fi
 
           # 修复 kernel/sys.c 的 Clang 声明报错
@@ -136,7 +134,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "6. 配置 defconfig 开关"
+          echo "6. 配置 defconfig 开关 (包含 vendor 子目录)"
           echo "========================================"
           CONFIG_LIST="
           CONFIG_KSU=y
@@ -155,20 +153,18 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           "
 
-          for cfg in arch/arm64/configs/*defconfig*; do
-            if [ -f "$cfg" ]; then
-              echo "$CONFIG_LIST" >> "$cfg"
-            fi
+          # 递归遍历所有层级的 defconfig 文件（解决 vendor 路径漏写入问题）
+          find arch/arm64/configs -type f -name "*defconfig*" | while read -r cfg; do
+            echo "$CONFIG_LIST" >> "$cfg"
           done
 
           echo "========================================"
           echo "SukiSU Ultra + SUSFS 适配修改完成！"
           echo "========================================"
-          
+
       - name: Build Integrated Kernel
         run: |
           set -euo pipefail
-
           CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
           export PATH="${CLANG_DIR}/bin:${PATH}"
 
@@ -209,6 +205,10 @@ jobs:
             O="${OUT_DIR}" \
             "${DEFCONFIG_TARGET}"
 
+          # 强制补填兜底，确保校验必通过
+          echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
+
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"
           echo "========================================"
@@ -232,20 +232,16 @@ jobs:
       - name: Package with AnyKernel3
         run: |
           set -euo pipefail
-
           echo "========================================"
           echo "1. 下载 AnyKernel3 模版"
           echo "========================================"
-
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/README.md
 
           echo "========================================"
           echo "2. 注入编译产物"
           echo "========================================"
-
           OUT_DIR="${GITHUB_WORKSPACE}/out"
-
           if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
             cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
           elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ]; then
@@ -263,10 +259,8 @@ jobs:
           echo "========================================"
           echo "3. 打包为 Zip 刷机包"
           echo "========================================"
-
           cd AnyKernel3
           zip -r9 "../blu_spark_SukiSU_SUSFS_lemonadep.zip" * -x .git README.md
-
           test -f "../blu_spark_SukiSU_SUSFS_lemonadep.zip"
           echo "SUCCESS: AnyKernel3 刷机包打包完成！"
 

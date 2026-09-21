@@ -59,7 +59,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 植入 SukiSU Ultra 驱动与 5.4 接口适配"
+          echo "3. 植入 SukiSU Ultra 驱动与 5.4 全局 API 适配"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
@@ -94,6 +94,15 @@ jobs:
             fi
           fi
 
+          # 4) 穿透软链接定位 selinux 目录，修复 Linux 5.4 下 struct selinux_state 缺失 policy 成员报错
+          SELINUX_DIR=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -type d -name "selinux" 2>/dev/null | head -n 1 || true)
+          if [ -n "$SELINUX_DIR" ]; then
+            REAL_SELINUX=$(readlink -f "$SELINUX_DIR")
+            echo "[+] 找到 selinux 真实物理路径: $REAL_SELINUX"
+            echo "[+] 将 SELinux 模块中的 policy 成员替换为 Linux 5.4 的 ss 成员"
+            sed -i 's/->policy/->ss/g; s/\.policy/\.ss/g' "$REAL_SELINUX"/*.c "$REAL_SELINUX"/*.h 2>/dev/null || true
+          fi
+
           echo "========================================"
           echo "4. 从 susfs4ksu 提取完整核心源码"
           echo "========================================"
@@ -102,16 +111,28 @@ jobs:
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "5. 应用 5.4 内核 SUSFS VFS 补丁与 sys.c 修复"
+          echo "5. 智能定位并应用 5.4 内核 SUSFS Patch"
           echo "========================================"
 
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
+          echo "[+] 正在搜寻仓库中的 Patch 文件..."
+          find /tmp/susfs4ksu -type f -name "*.patch" || true
+
+          # 优先匹配路径或文件名带 5.4 的 patch
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -path "*5.4*" -o -name "*5.4*" \) -name "*.patch" | head -n 1 || true)
+
+          # 若未找到则退而求其次寻找包含 vfs 的 patch
+          if [ -z "$SUSFS_PATCH" ]; then
+            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*vfs*.patch" | head -n 1 || true)
+          fi
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 找到 5.4 补丁: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || { echo "WARNING: Patch 对齐存在部分 conflict，将继续编译运行"; }
+            echo "[+] 成功定位目标 Patch: $SUSFS_PATCH"
+            patch -p1 --forward < "$SUSFS_PATCH" || {
+              echo "[-] 警告: Patch 部分未完全对齐，列出产生的冲突 .rej 文件："
+              find . -name "*.rej" || true
+            }
           else
-            echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
+            echo "[!] 未在仓库中找到任何 Patch 文件，跳过 patch 步骤"
           fi
 
           # 修复 Clang 下 override_custom_release -Werror=unused-function 报错
@@ -165,7 +186,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 适配完成！"
+          echo "SukiSU Ultra + SELinux 适配完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

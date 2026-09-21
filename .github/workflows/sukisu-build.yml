@@ -30,22 +30,18 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "1. 克隆 SukiSU Ultra 与 susfs4ksu"
+          echo "1. 克隆 SukiSU Ultra 与 个人镜像 susfs4ksu"
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
 
-          git clone --depth=1 -b v0.12.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
-          git clone --depth=1 -b v1.0.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          # 1.1 克隆 SukiSU Ultra
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
-          SUSFS_BRANCH=$(git ls-remote --heads https://github.com/Star-Seven/susfs4ksu.git | grep -i '5\.4' | head -n 1 | awk '{print $2}' | sed 's#refs/heads/##' || true)
-          if [ -n "${SUSFS_BRANCH}" ]; then
-            echo "[+] 成功定位到 SUSFS 5.4 分支: ${SUSFS_BRANCH}"
-            git clone --depth=1 -b "${SUSFS_BRANCH}" https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
-          else
-            echo "[+] 未找到 5.4 独立分支，拉取 susfs4ksu 默认主分支"
-            git clone --depth=1 https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
-          fi
+          # 1.2 从个人 GitHub 仓库拉取 5.4 分支（优先 kernel-5.4，退守 5.4，最后默认分支）
+          echo "[+] 正在从 huaiding230-code/susfs4ksu 拉取补丁..."
+          git clone --depth=1 -b kernel-5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
+          git clone --depth=1 -b 5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
+          git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
 
           echo "========================================"
           echo "2. 还原 DTS 目录"
@@ -110,22 +106,22 @@ jobs:
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-          echo "[+] 列出 susfs4ksu 仓库中的所有补丁文件："
+          echo "[+] 当前拉取到的补丁文件清单："
           find /tmp/susfs4ksu -type f -name "*.patch" || true
 
-          # 1. 优先在文件路径或文件名中精准匹配 5.4 / 5_4
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" | grep -iE "5[\._]4" | head -n 1 || true)
+          # 排除 4.14 / 4.19 补丁，精准获取 5.4 补丁
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" ! -name "*4.14*" ! -name "*4.19*" | grep -iE "5[\._]4|vfs|susfs" | head -n 1 || true)
 
-          # 2. 若处于 5.4 专属分支中（文件名无 5.4 标识），自动退守选取分支内的 vfs/susfs 补丁
+          # 备选匹配：选择任意非 4.x 的 patch 文件
           if [ -z "$SUSFS_PATCH" ]; then
-            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*vfs*.patch" -o -name "*susfs*.patch" -o -name "*.patch" \) | head -n 1 || true)
+            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" ! -name "*4.14*" ! -name "*4.19*" | head -n 1 || true)
           fi
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 成功匹配到目标补丁文件: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 补丁应用存在部分冲突，将尝试继续编译"; }
+            echo "[+] 成功定位到目标补丁: $SUSFS_PATCH"
+            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 部分补丁打入有冲突，尝试继续"; }
           else
-            echo "[-] 错误: 未在 susfs4ksu 仓库中找到任何 .patch 文件！"
+            echo "[-] 致命错误: 未找到适用于 5.4 内核的 VFS 补丁！"
             exit 1
           fi
 
@@ -144,7 +140,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "6. 配置 defconfig 开关 (包含 vendor 子目录)"
+          echo "6. 配置 defconfig 开关"
           echo "========================================"
           CONFIG_LIST="
           CONFIG_KSU=y
@@ -163,7 +159,6 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           "
 
-          # 递归遍历所有层级的 defconfig 文件（解决 vendor 路径漏写入问题）
           find arch/arm64/configs -type f -name "*defconfig*" | while read -r cfg; do
             echo "$CONFIG_LIST" >> "$cfg"
           done
@@ -171,7 +166,6 @@ jobs:
           echo "========================================"
           echo "SukiSU Ultra + SUSFS 适配修改完成！"
           echo "========================================"
-
       - name: Build Integrated Kernel
         run: |
           set -euo pipefail

@@ -32,17 +32,14 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "1. 克隆 5.4 兼容版本的 SukiSU Ultra 与 susfs4ksu"
+          echo "1. 克隆 SukiSU Ultra 与 susfs4ksu"
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
 
-          # 锁定支持 5.4 内核 SELinux 结构的稳定 Tag (如 v0.12.3)
-          # 若 Tag 不存在则自动 Fallback 到稳定分支
           git clone --depth=1 -b v0.12.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 -b v1.0.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
-          # 定位 5.4 分支的 SUSFS
           SUSFS_BRANCH=$(git ls-remote --heads https://github.com/Star-Seven/susfs4ksu.git | grep -i '5\.4' | head -n 1 | awk '{print $2}' | sed 's#refs/heads/##' || true)
           if [ -n "${SUSFS_BRANCH}" ]; then
             echo "[+] 成功定位到 SUSFS 5.4 分支: ${SUSFS_BRANCH}"
@@ -81,6 +78,24 @@ jobs:
               sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
               sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
             fi
+          fi
+
+          # 3.3 修复 allowlist.c (5.4 缺失 TWA_RESUME 与 task.h)
+          RAW_ALLOWLIST=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "allowlist.c" 2>/dev/null | head -n 1 || true)
+          if [ -n "$RAW_ALLOWLIST" ]; then
+            ALLOWLIST_FILE=$(readlink -f "$RAW_ALLOWLIST")
+            echo "[+] 找到 allowlist.c: $ALLOWLIST_FILE，补充 5.4 兼容头文件与 TWA_RESUME"
+            sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
+          fi
+
+          # 3.4 修复 rules.c (5.4 内核 SELinux 锁机制)
+          RAW_RULES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "rules.c" 2>/dev/null | head -n 1 || true)
+          if [ -n "$RAW_RULES" ]; then
+            RULES_FILE=$(readlink -f "$RAW_RULES")
+            echo "[+] 找到 rules.c: $RULES_FILE，修正 5.4 SELinux 锁"
+            sed -i 's/mutex_lock(&selinux_state.ss_mutex);/write_lock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
+            sed -i 's/mutex_unlock(&selinux_state.ss_mutex);/write_unlock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
+            sed -i 's/selinux_state.ss_mutex/selinux_state.ss->policy_lock/g' "$RULES_FILE" || true
           fi
 
           echo "========================================"

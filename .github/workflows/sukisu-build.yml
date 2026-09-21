@@ -62,12 +62,12 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
+          # 2) 使用宽泛正则强制修复 pkg_observer.c 的 5.4 fsnotify 接口
           PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
           if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
             echo "[+] 修复 $PKG_OBSERVER 的 Linux 5.4 fsnotify 接口"
             sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
-            sed -i 's/\.handle_inode_event = ksu_handle_inode_event,/\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
+            sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
           fi
 
           echo "========================================"
@@ -90,7 +90,7 @@ jobs:
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "5. 应用 5.4 内核 SUSFS VFS 补丁与 sys.c 兼容修复"
+          echo "5. 应用 5.4 内核 SUSFS VFS 补丁与 sys.c 修复"
           echo "========================================"
 
           SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
@@ -154,7 +154,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 集成与 sys.c 修复完成！"
+          echo "SukiSU Ultra + SUSFS + pkg_observer 修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

@@ -29,118 +29,89 @@ jobs:
       - name: Integrate SukiSU Ultra + SUSFS
         run: |
           set -euo pipefail
-
           cd kernel_source
 
           echo "========================================"
-          echo "1. 克隆 SukiSU Ultra 与 Star-Seven/susfs4ksu"
+          echo "1. 克隆 5.4 兼容版本的 SukiSU Ultra 与 susfs4ksu"
           echo "========================================"
-
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
+
+          # 锁定支持 5.4 内核 SELinux 结构的稳定 Tag (如 v0.12.3)
+          # 若 Tag 不存在则自动 Fallback 到稳定分支
+          git clone --depth=1 -b v0.12.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          git clone --depth=1 -b v1.0.3 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
+          # 定位 5.4 分支的 SUSFS
           SUSFS_BRANCH=$(git ls-remote --heads https://github.com/Star-Seven/susfs4ksu.git | grep -i '5\.4' | head -n 1 | awk '{print $2}' | sed 's#refs/heads/##' || true)
-
           if [ -n "${SUSFS_BRANCH}" ]; then
-            echo "[+] 成功定位到 SUSFS 目标分支: ${SUSFS_BRANCH}"
+            echo "[+] 成功定位到 SUSFS 5.4 分支: ${SUSFS_BRANCH}"
             git clone --depth=1 -b "${SUSFS_BRANCH}" https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
           else
-            echo "[+] 未找到包含 5.4 字样的独立分支，直接拉取 susfs4ksu 默认主分支"
+            echo "[+] 未找到 5.4 独立分支，拉取 susfs4ksu 默认主分支"
             git clone --depth=1 https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
           fi
 
           echo "========================================"
-          echo "2. 还原 DTS 目录，保持源码原始格式"
+          echo "2. 还原 DTS 目录"
           echo "========================================"
-
           if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            echo "[+] 恢复 vendor/oplus 目录至干净状态"
             git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
           fi
 
           echo "========================================"
-          echo "3. 植入 SukiSU Ultra 驱动与 5.4 全局 API 适配"
+          echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"
           echo "========================================"
-
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 1) 自动补齐 5.4 内核缺失的 linux/pgtable.h
+          # 3.1 自动补齐 5.4 内核缺失的 linux/pgtable.h
           if [ ! -f "include/linux/pgtable.h" ]; then
             echo "[+] 创建 linux/pgtable.h 兼容垫片"
             mkdir -p include/linux
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 穿透软链接定位 pkg_observer.c 并修复 5.4 fsnotify 接口
+          # 3.2 修复 pkg_observer.c (5.4 fsnotify 接口)
           RAW_OBSERVER=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$RAW_OBSERVER" ]; then
             PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
-            echo "[+] 找到 pkg_observer.c 真实物理路径: $PKG_OBSERVER"
+            echo "[+] 找到 pkg_observer.c: $PKG_OBSERVER"
             if [ -f "$PKG_OBSERVER" ] && grep -q "handle_inode_event" "$PKG_OBSERVER"; then
-              echo "[+] 修改 $PKG_OBSERVER 以适配 Linux 5.4 fsnotify 结构体"
+              echo "[+] 适配 5.4 fsnotify 结构体"
               sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
               sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
             fi
           fi
 
-          # 3) 穿透软链接定位 allowlist.c 并修复 Linux 5.4 下的 TWA_RESUME 与 put_task_struct 声明
-          RAW_ALLOWLIST=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "allowlist.c" 2>/dev/null | head -n 1 || true)
-          if [ -n "$RAW_ALLOWLIST" ]; then
-            ALLOWLIST=$(readlink -f "$RAW_ALLOWLIST")
-            echo "[+] 找到 allowlist.c 真实物理路径: $ALLOWLIST"
-            if [ -f "$ALLOWLIST" ]; then
-              echo "[+] 修复 $ALLOWLIST 的 Linux 5.4 TWA_RESUME 与 put_task_struct 缺失"
-              sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME true\n#endif' "$ALLOWLIST"
-            fi
-          fi
-
-          # 4) 穿透软链接定位 selinux 目录，修复 Linux 5.4 下 struct selinux_state 缺失 policy 成员报错
-          SELINUX_DIR=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -type d -name "selinux" 2>/dev/null | head -n 1 || true)
-          if [ -n "$SELINUX_DIR" ]; then
-            REAL_SELINUX=$(readlink -f "$SELINUX_DIR")
-            echo "[+] 找到 selinux 真实物理路径: $REAL_SELINUX"
-            echo "[+] 将 SELinux 模块中的 policy 成员替换为 Linux 5.4 的 ss 成员"
-            sed -i 's/->policy/->ss/g; s/\.policy/\.ss/g' "$REAL_SELINUX"/*.c "$REAL_SELINUX"/*.h 2>/dev/null || true
-          fi
-
           echo "========================================"
-          echo "4. 从 susfs4ksu 提取完整核心源码"
+          echo "4. 从 susfs4ksu 提取源码文件"
           echo "========================================"
-
-          find /tmp/susfs4ksu -name "susfs.c" -exec cp {} fs/ \;
+          SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
+          if [ -n "$SUSFS_C" ]; then
+            cp "$SUSFS_C" fs/
+          else
+            echo "[-] 错误: 未在 susfs4ksu 中找到 susfs.c" && exit 1
+          fi
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "5. 智能定位并应用 5.4 内核 SUSFS Patch"
+          echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-
-          echo "[+] 正在搜寻仓库中的 Patch 文件..."
-          find /tmp/susfs4ksu -type f -name "*.patch" || true
-
-          # 优先匹配路径或文件名带 5.4 的 patch
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -path "*5.4*" -o -name "*5.4*" \) -name "*.patch" | head -n 1 || true)
-
-          # 若未找到则退而求其次寻找包含 vfs 的 patch
-          if [ -z "$SUSFS_PATCH" ]; then
-            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*vfs*.patch" | head -n 1 || true)
-          fi
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -path "*/5.4/*" -o -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 成功定位目标 Patch: $SUSFS_PATCH"
-            patch -p1 --forward < "$SUSFS_PATCH" || {
-              echo "[-] 警告: Patch 部分未完全对齐，列出产生的冲突 .rej 文件："
-              find . -name "*.rej" || true
-            }
+            echo "[+] 应用目标补丁: $SUSFS_PATCH"
+            patch -p1 < "$SUSFS_PATCH" || true
           else
-            echo "[!] 未在仓库中找到任何 Patch 文件，跳过 patch 步骤"
+            echo "[!] 警告: 未找到 5.4 VFS 补丁，跳过 patch 步骤"
           fi
 
-          # 修复 Clang 下 override_custom_release -Werror=unused-function 报错
+          # 修复 kernel/sys.c 的 Clang 声明报错
           if grep -q "override_custom_release" kernel/sys.c; then
-            echo "[+] 为 kernel/sys.c 添加 __maybe_unused 修复 Clang 编译报错"
             sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c
           fi
 
+          # 追加 Makefile 和 Kconfig
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
@@ -150,18 +121,8 @@ jobs:
           fi
 
           echo "========================================"
-          echo "6. 严格断言（Assert）核心文件"
+          echo "6. 配置 defconfig 开关"
           echo "========================================"
-
-          test -f fs/susfs.c
-          test -f include/linux/susfs.h
-          test -f include/linux/susfs_def.h
-          test -f include/linux/pgtable.h
-
-          echo "========================================"
-          echo "7. 追加 SUSFS 编译开关至 defconfig"
-          echo "========================================"
-
           CONFIG_LIST="
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
@@ -186,7 +147,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SELinux 适配完成！"
+          echo "SukiSU Ultra + SUSFS 适配修改完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

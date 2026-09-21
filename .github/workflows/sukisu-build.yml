@@ -50,28 +50,32 @@ jobs:
           fi
 
           echo "========================================"
-          echo "2. 植入 SukiSU Ultra 驱动与 5.4 内核垫片"
+          echo "2. 植入 SukiSU Ultra 驱动与 5.4 内核兼容适配"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 解决 Linux 5.4 缺少 linux/pgtable.h 的问题
+          # 1) 自动补齐 5.4 内核缺失的 linux/pgtable.h
           if [ ! -f "include/linux/pgtable.h" ]; then
-            echo "[+] 自动创建 linux/pgtable.h 兼容垫片"
-            echo "#ifndef _LINUX_PGTABLE_H" > include/linux/pgtable.h
-            echo "#define _LINUX_PGTABLE_H" >> include/linux/pgtable.h
-            echo "#include <asm/pgtable.h>" >> include/linux/pgtable.h
-            echo "#endif" >> include/linux/pgtable.h
+            echo "[+] 创建 linux/pgtable.h 兼容垫片"
+            mkdir -p include/linux
+            echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
+          fi
+
+          # 2) 使用纯 Perl 单行正则修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
+          PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
+          if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
+            echo "[+] 使用 Perl 修复 $PKG_OBSERVER"
+            perl -i -pe 'print "#include <linux/version.h>\n" if $. == 1' "$PKG_OBSERVER"
+            perl -i -pe 's/(static const struct fsnotify_ops)/#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)\nstatic int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info)\n{\n    return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie);\n}\n#endif\n$1/' "$PKG_OBSERVER"
+            perl -i -pe 's/\.handle_inode_event = ksu_handle_inode_event,/#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)\n\t.handle_inode_event = ksu_handle_inode_event,\n#else\n\t.handle_event = ksu_handle_event,\n#endif/' "$PKG_OBSERVER"
           fi
 
           echo "========================================"
           echo "3. 从 susfs4ksu 提取完整核心源码"
           echo "========================================"
 
-          # 提取 C 源码
           find /tmp/susfs4ksu -name "susfs.c" -exec cp {} fs/ \;
-
-          # 提取所有 susfs 头文件 (含 susfs.h 与 susfs_def.h)
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"

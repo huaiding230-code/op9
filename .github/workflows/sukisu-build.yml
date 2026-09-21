@@ -50,7 +50,16 @@ jobs:
           fi
 
           echo "========================================"
-          echo "2. 植入 SukiSU Ultra 驱动与 5.4 接口适配"
+          echo "2. 还原 DTS 目录，保持源码原始格式"
+          echo "========================================"
+
+          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
+            echo "[+] 恢复 vendor/oplus 目录至干净状态"
+            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
+          fi
+
+          echo "========================================"
+          echo "3. 植入 SukiSU Ultra 驱动与 5.4 接口适配"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
@@ -62,54 +71,15 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
-          PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
-          if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
-            echo "[+] 修复 $PKG_OBSERVER 的 Linux 5.4 fsnotify 接口"
-            sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
-            sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
-          fi
-
-          echo "========================================"
-          echo "3. 还原并使用纯 awk 重构 OPLUS DTS Makefile 语法"
-          echo "========================================"
-
-          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            echo "[+] 还原 DTS 目录中的 Makefile 至干净状态"
-            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
-
-            echo "[+] 使用纯 awk 重新格式化所有 Makefile"
-            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" | while read -r mkfile; do
-              awk '
-              {
-                sub(/\r$/, "")
-                sub(/[ \t]+$/, "")
-              }
-              /^[ \t]*dtbo-y[ \t]*\+=/ {
-                sub(/^[ \t]+/, "")
-                sub(/\\$/, "")
-                sub(/[ \t]+$/, "")
-                if ($0 != "dtbo-y +=") {
-                  print $0
-                }
-                next
-              }
-              /^[ \t]+.*\.dtb/ {
-                sub(/^[ \t]+/, "")
-                sub(/\\$/, "")
-                sub(/[ \t]+$/, "")
-                print "dtbo-y += " $0
-                next
-              }
-              {
-                print $0
-              }
-              ' "$mkfile" > "$mkfile.tmp" && mv "$mkfile.tmp" "$mkfile"
-            done
-
-            if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
-              echo "[+] 重构后的 lemonadev/Makefile 前 20 行内容："
-              head -n 20 arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile || true
+          # 2) 穿透软链接定位 pkg_observer.c 真实物理路径并精准修复 5.4 fsnotify 接口
+          RAW_OBSERVER=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
+          if [ -n "$RAW_OBSERVER" ]; then
+            PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
+            echo "[+] 找到 pkg_observer.c 真实物理路径: $PKG_OBSERVER"
+            if [ -f "$PKG_OBSERVER" ] && grep -q "handle_inode_event" "$PKG_OBSERVER"; then
+              echo "[+] 修改 $PKG_OBSERVER 以适配 Linux 5.4 fsnotify 结构体"
+              sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
+              sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
             fi
           fi
 
@@ -155,7 +125,6 @@ jobs:
           test -f include/linux/susfs.h
           test -f include/linux/susfs_def.h
           test -f include/linux/pgtable.h
-          test -d drivers/kernelsu
 
           echo "========================================"
           echo "7. 追加 SUSFS 编译开关至 defconfig"
@@ -185,7 +154,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS + 纯 Shell DTS 修复完成！"
+          echo "SukiSU Ultra + SUSFS 彻底适配完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

@@ -62,7 +62,7 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 使用 sed 精准修复 pkg_observer.c 适用于 Linux 5.4 内核
+          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
           PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
           if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
             echo "[+] 修复 $PKG_OBSERVER 的 Linux 5.4 fsnotify 接口"
@@ -71,12 +71,15 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 强制顶格清理所有 OPLUS DTS Makefile 行首缩进"
+          echo "3. 还原并精准修复 OPLUS DTS Makefile 缩进"
           echo "========================================"
 
           if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            echo "[+] 扫描并清理 vendor/oplus 下所有 Makefile 的行首空格和 Tab"
-            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i 's/^[ \t]*//' {} +
+            echo "[+] 还原 DTS 目录中的 Makefile 至干净状态"
+            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
+
+            echo "[+] 精准清理变量赋值行（如 dtbo-y +=）前面的空白符"
+            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i 's/^[ \t]*\([a-zA-Z0-9_\-]\+[ \t]*[+:=]\)/\1/' {} +
           fi
 
           echo "========================================"
@@ -145,7 +148,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 集成完成！"
+          echo "SukiSU Ultra + SUSFS + 精准 DTS 修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

@@ -62,7 +62,7 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 使用宽泛正则强制修复 pkg_observer.c 的 5.4 fsnotify 接口
+          # 2) 修复 pkg_observer.c 在 Linux 5.4 下的 fsnotify 接口
           PKG_OBSERVER=$(find drivers/kernelsu -name "pkg_observer.c" | head -n 1 || true)
           if [ -n "$PKG_OBSERVER" ] && [ -f "$PKG_OBSERVER" ]; then
             echo "[+] 修复 $PKG_OBSERVER 的 Linux 5.4 fsnotify 接口"
@@ -71,15 +71,46 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 还原并精准修复 OPLUS DTS Makefile 缩进"
+          echo "3. 还原并使用纯 awk 重构 OPLUS DTS Makefile 语法"
           echo "========================================"
 
           if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
             echo "[+] 还原 DTS 目录中的 Makefile 至干净状态"
             git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
 
-            echo "[+] 精准清理变量赋值行前面的空白符"
-            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i 's/^[ \t]*\([a-zA-Z0-9_\-]\+[ \t]*[+:=]\)/\1/' {} +
+            echo "[+] 使用纯 awk 重新格式化所有 Makefile"
+            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" | while read -r mkfile; do
+              awk '
+              {
+                sub(/\r$/, "")
+                sub(/[ \t]+$/, "")
+              }
+              /^[ \t]*dtbo-y[ \t]*\+=/ {
+                sub(/^[ \t]+/, "")
+                sub(/\\$/, "")
+                sub(/[ \t]+$/, "")
+                if ($0 != "dtbo-y +=") {
+                  print $0
+                }
+                next
+              }
+              /^[ \t]+.*\.dtb/ {
+                sub(/^[ \t]+/, "")
+                sub(/\\$/, "")
+                sub(/[ \t]+$/, "")
+                print "dtbo-y += " $0
+                next
+              }
+              {
+                print $0
+              }
+              ' "$mkfile" > "$mkfile.tmp" && mv "$mkfile.tmp" "$mkfile"
+            done
+
+            if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
+              echo "[+] 重构后的 lemonadev/Makefile 前 20 行内容："
+              head -n 20 arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile || true
+            fi
           fi
 
           echo "========================================"
@@ -154,7 +185,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS + pkg_observer 修复完成！"
+          echo "SukiSU Ultra + SUSFS + 纯 Shell DTS 修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

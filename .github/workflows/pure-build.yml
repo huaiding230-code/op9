@@ -44,7 +44,23 @@ jobs:
           mkdir -p "${OUT_DIR}"
 
           echo "========================================"
-          echo "1. 生成默认内核配置 (defconfig)"
+          echo "1. 自动定位配置文件 (defconfig)"
+          echo "========================================"
+
+          # 自动寻找适配 lemonadep / lahaina / blu_spark 的 defconfig
+          DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
+
+          if [ -z "${DEFCONFIG_TARGET}" ]; then
+            echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
+            echo "现有配置文件清单："
+            find arch/arm64/configs/ -type f
+            exit 1
+          fi
+
+          echo "成功匹配到配置文件: ${DEFCONFIG_TARGET}"
+
+          echo "========================================"
+          echo "2. 生成内核配置 (.config)"
           echo "========================================"
 
           make \
@@ -55,10 +71,10 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             O="${OUT_DIR}" \
-            vendor/lemonadep-perf_defconfig
+            "${DEFCONFIG_TARGET}"
 
           echo "========================================"
-          echo "2. 开始编译纯内核"
+          echo "3. 开始编译纯内核"
           echo "========================================"
 
           make \
@@ -72,15 +88,15 @@ jobs:
             -j$(nproc)
 
           echo "========================================"
-          echo "3. 检查构建产物"
+          echo "4. 检查构建产物"
           echo "========================================"
 
           if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
             echo "SUCCESS: 纯内核编译成功！产物: Image.gz-dtb"
-          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ]; then
-            echo "SUCCESS: 纯内核编译成功！产物: Image.gz"
+          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ] || [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
+            echo "SUCCESS: 纯内核编译成功！"
           else
-            echo "ERROR: 未在产物目录找到 Image.gz 或 Image.gz-dtb"
+            echo "ERROR: 未在产物目录找到内核镜像"
             exit 1
           fi
 

@@ -50,26 +50,29 @@ jobs:
           fi
 
           echo "========================================"
-          echo "2. 植入 SukiSU Ultra 驱动"
+          echo "2. 植入 SukiSU Ultra 驱动与 5.4 内核垫片"
           echo "========================================"
 
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          echo "========================================"
-          echo "3. 从 susfs4ksu 提取核心源码"
-          echo "========================================"
-
-          SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1 || true)
-          SUSFS_H=$(find /tmp/susfs4ksu -name "susfs.h" | head -n 1 || true)
-
-          if [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
-            cp "$SUSFS_C" fs/
-            cp "$SUSFS_H" include/linux/
-            echo "[+] 成功提取并放置 susfs.c 和 susfs.h"
-          else
-            echo "ERROR: 在 susfs4ksu 仓库中未找到 susfs.c 或 susfs.h！"
-            exit 1
+          # 解决 Linux 5.4 缺少 linux/pgtable.h 的问题
+          if [ ! -f "include/linux/pgtable.h" ]; then
+            echo "[+] 自动创建 linux/pgtable.h 兼容垫片"
+            echo "#ifndef _LINUX_PGTABLE_H" > include/linux/pgtable.h
+            echo "#define _LINUX_PGTABLE_H" >> include/linux/pgtable.h
+            echo "#include <asm/pgtable.h>" >> include/linux/pgtable.h
+            echo "#endif" >> include/linux/pgtable.h
           fi
+
+          echo "========================================"
+          echo "3. 从 susfs4ksu 提取完整核心源码"
+          echo "========================================"
+
+          # 提取 C 源码
+          find /tmp/susfs4ksu -name "susfs.c" -exec cp {} fs/ \;
+
+          # 提取所有 susfs 头文件 (含 susfs.h 与 susfs_def.h)
+          find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
           echo "4. 应用 5.4 内核 SUSFS VFS 补丁"
@@ -84,12 +87,10 @@ jobs:
             echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
           fi
 
-          # 补充 fs/Makefile 编译配置
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
 
-          # 安全补充 fs/Kconfig 菜单项（严禁删除原有的 endmenu）
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
             echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
@@ -100,6 +101,8 @@ jobs:
 
           test -f fs/susfs.c
           test -f include/linux/susfs.h
+          test -f include/linux/susfs_def.h
+          test -f include/linux/pgtable.h
           test -d drivers/kernelsu
 
           echo "========================================"

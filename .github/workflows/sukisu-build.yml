@@ -39,7 +39,6 @@ jobs:
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
-          # 自动获取远端包含 5.4 的分支；若未匹配到则自动拉取默认主分支
           SUSFS_BRANCH=$(git ls-remote --heads https://github.com/Star-Seven/susfs4ksu.git | grep -i '5\.4' | head -n 1 | awk '{print $2}' | sed 's#refs/heads/##' || true)
 
           if [ -n "${SUSFS_BRANCH}" ]; then
@@ -60,10 +59,10 @@ jobs:
           echo "3. 从 susfs4ksu 提取核心源码"
           echo "========================================"
 
-          SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
-          SUSFS_H=$(find /tmp/susfs4ksu -name "susfs.h" | head -n 1)
+          SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1 || true)
+          SUSFS_H=$(find /tmp/susfs4ksu -name "susfs.h" | head -n 1 || true)
 
-          if [ -n "$SUSFS_C" ] && [ -n "$SUSFS_H" ] && [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
+          if [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
             cp "$SUSFS_C" fs/
             cp "$SUSFS_H" include/linux/
             echo "[+] 成功提取并放置 susfs.c 和 susfs.h"
@@ -85,14 +84,14 @@ jobs:
             echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
           fi
 
+          # 补充 fs/Makefile 编译配置
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
 
+          # 安全补充 fs/Kconfig 菜单项（严禁删除原有的 endmenu）
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
-            sed -i '/endmenu/d' fs/Kconfig || true
-            echo -e 'config KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y' >> fs/Kconfig
-            echo 'endmenu' >> fs/Kconfig
+            echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
 
           echo "========================================"

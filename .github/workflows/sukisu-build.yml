@@ -72,12 +72,12 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 批量修复所有 OPLUS 机型 Makefile TAB 缩进错误"
+          echo "3. 强制顶格清理所有 OPLUS DTS Makefile 行首缩进"
           echo "========================================"
 
           if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            echo "[+] 扫描并替换 vendor/oplus 下所有 Makefile 中的空格缩进"
-            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i $'s/^[ ]\{8\}/\t/' {} +
+            echo "[+] 扫描并清理 vendor/oplus 下所有 Makefile 的行首空格和 Tab"
+            find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i 's/^[ \t]*//' {} +
           fi
 
           echo "========================================"
@@ -146,7 +146,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS + 全局 Makefile 修复完成！"
+          echo "SukiSU Ultra + SUSFS + DTS 顶格修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

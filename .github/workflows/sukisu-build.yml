@@ -110,14 +110,22 @@ jobs:
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-          # 仅精准匹配文件名或路径中包含 5.4 的 patch 文件
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -path "*/5.4/*" \) | head -n 1 || true)
+          echo "[+] 列出 susfs4ksu 仓库中的所有补丁文件："
+          find /tmp/susfs4ksu -type f -name "*.patch" || true
+
+          # 1. 优先在文件路径或文件名中精准匹配 5.4 / 5_4
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" | grep -iE "5[\._]4" | head -n 1 || true)
+
+          # 2. 若处于 5.4 专属分支中（文件名无 5.4 标识），自动退守选取分支内的 vfs/susfs 补丁
+          if [ -z "$SUSFS_PATCH" ]; then
+            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*vfs*.patch" -o -name "*susfs*.patch" -o -name "*.patch" \) | head -n 1 || true)
+          fi
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 匹配到 5.4 目标补丁: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 补丁应用存在冲突，请检查 .rej 文件"; }
+            echo "[+] 成功匹配到目标补丁文件: $SUSFS_PATCH"
+            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 补丁应用存在部分冲突，将尝试继续编译"; }
           else
-            echo "[-] 错误: 未在 susfs4ksu 仓库中找到适用于 5.4 内核的 .patch 文件！"
+            echo "[-] 错误: 未在 susfs4ksu 仓库中找到任何 .patch 文件！"
             exit 1
           fi
 

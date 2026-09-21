@@ -47,17 +47,14 @@ jobs:
           echo "1. 自动定位配置文件 (defconfig)"
           echo "========================================"
 
-          # 自动寻找适配 lemonadep / lahaina / blu_spark 的 defconfig
           DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
 
           if [ -z "${DEFCONFIG_TARGET}" ]; then
             echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
-            echo "现有配置文件清单："
-            find arch/arm64/configs/ -type f
             exit 1
           fi
 
-          echo "成功匹配到配置文件: ${DEFCONFIG_TARGET}"
+          echo "匹配配置文件: ${DEFCONFIG_TARGET}"
 
           echo "========================================"
           echo "2. 生成内核配置 (.config)"
@@ -74,7 +71,7 @@ jobs:
             "${DEFCONFIG_TARGET}"
 
           echo "========================================"
-          echo "3. 开始编译纯内核"
+          echo "3. 开始编译内核"
           echo "========================================"
 
           make \
@@ -87,23 +84,50 @@ jobs:
             O="${OUT_DIR}" \
             -j$(nproc)
 
+      - name: Package with AnyKernel3
+        run: |
+          set -euo pipefail
+
           echo "========================================"
-          echo "4. 检查构建产物"
+          echo "1. 下载 AnyKernel3 模版"
           echo "========================================"
 
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          rm -rf AnyKernel3/.git AnyKernel3/README.md
+
+          echo "========================================"
+          echo "2. 注入编译产物"
+          echo "========================================"
+
+          OUT_DIR="${GITHUB_WORKSPACE}/out"
+          
           if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
-            echo "SUCCESS: 纯内核编译成功！产物: Image.gz-dtb"
-          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ] || [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
-            echo "SUCCESS: 纯内核编译成功！"
+            cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
+          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ]; then
+            cp "${OUT_DIR}/arch/arm64/boot/Image.gz" AnyKernel3/
+            if [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ]; then
+              cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
+            fi
+          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
+            cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
           else
-            echo "ERROR: 未在产物目录找到内核镜像"
+            echo "ERROR: 未找到支持的内核镜像文件！"
             exit 1
           fi
 
-      - name: Upload Pure Kernel Artifacts
+          echo "========================================"
+          echo "3. 打包为 Zip 刷机包"
+          echo "========================================"
+
+          cd AnyKernel3
+          zip -r9 "../blu_spark_lemonadep_kernel.zip" * -x .git README.md
+
+          # 校验 zip 是否打包成功
+          test -f "../blu_spark_lemonadep_kernel.zip"
+          echo "SUCCESS: AnyKernel3 刷机包打包完成！"
+
+      - name: Upload Kernel Zip Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Pure-blu_spark-Kernel
-          path: |
-            out/arch/arm64/boot/Image*
-            out/arch/arm64/boot/dtb*
+          name: blu_spark-lemonadep-Kernel-Zip
+          path: blu_spark_lemonadep_kernel.zip

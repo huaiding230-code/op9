@@ -110,13 +110,15 @@ jobs:
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" | head -n 1 || true)
+          # 仅精准匹配文件名或路径中包含 5.4 的 patch 文件
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -path "*/5.4/*" \) | head -n 1 || true)
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 应用目标补丁: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || true
+            echo "[+] 匹配到 5.4 目标补丁: $SUSFS_PATCH"
+            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 补丁应用存在冲突，请检查 .rej 文件"; }
           else
-            echo "[!] 警告: 未找到 VFS 补丁，跳过 patch 步骤"
+            echo "[-] 错误: 未在 susfs4ksu 仓库中找到适用于 5.4 内核的 .patch 文件！"
+            exit 1
           fi
 
           # 修复 kernel/sys.c 的 Clang 声明报错

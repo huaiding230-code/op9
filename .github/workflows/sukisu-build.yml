@@ -38,7 +38,17 @@ jobs:
 
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
-          git clone --depth=1 -b kernel-5.4 https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
+
+          # 自动获取远端包含 5.4 的分支；若未匹配到则自动拉取默认主分支
+          SUSFS_BRANCH=$(git ls-remote --heads https://github.com/Star-Seven/susfs4ksu.git | grep -i '5\.4' | head -n 1 | awk '{print $2}' | sed 's#refs/heads/##' || true)
+
+          if [ -n "${SUSFS_BRANCH}" ]; then
+            echo "[+] 成功定位到 SUSFS 目标分支: ${SUSFS_BRANCH}"
+            git clone --depth=1 -b "${SUSFS_BRANCH}" https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
+          else
+            echo "[+] 未找到包含 5.4 字样的独立分支，直接拉取 susfs4ksu 默认主分支"
+            git clone --depth=1 https://github.com/Star-Seven/susfs4ksu.git /tmp/susfs4ksu
+          fi
 
           echo "========================================"
           echo "2. 植入 SukiSU Ultra 驱动"
@@ -47,19 +57,18 @@ jobs:
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
           echo "========================================"
-          echo "3. 从 Star-Seven/susfs4ksu 复制核心源码"
+          echo "3. 从 susfs4ksu 提取核心源码"
           echo "========================================"
 
-          # 复制 susfs.c 与 susfs.h 到内核源码树
           SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
           SUSFS_H=$(find /tmp/susfs4ksu -name "susfs.h" | head -n 1)
 
-          if [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
+          if [ -n "$SUSFS_C" ] && [ -n "$SUSFS_H" ] && [ -f "$SUSFS_C" ] && [ -f "$SUSFS_H" ]; then
             cp "$SUSFS_C" fs/
             cp "$SUSFS_H" include/linux/
             echo "[+] 成功提取并放置 susfs.c 和 susfs.h"
           else
-            echo "ERROR: 在 Star-Seven/susfs4ksu 中未找到 susfs.c 或 susfs.h！"
+            echo "ERROR: 在 susfs4ksu 仓库中未找到 susfs.c 或 susfs.h！"
             exit 1
           fi
 
@@ -67,8 +76,7 @@ jobs:
           echo "4. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
 
-          # 在 susfs4ksu 中寻找适用于 5.4 内核的 patch 文件
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1)
+          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
 
           if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
             echo "[+] 找到 5.4 补丁: $SUSFS_PATCH"
@@ -77,12 +85,10 @@ jobs:
             echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
           fi
 
-          # 补充 fs/Makefile 编译配置
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
 
-          # 补充 fs/Kconfig 菜单项
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
             sed -i '/endmenu/d' fs/Kconfig || true
             echo -e 'config KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y' >> fs/Kconfig
@@ -98,7 +104,7 @@ jobs:
           test -d drivers/kernelsu
 
           echo "========================================"
-          echo "6. 追加 SUSFS 完整编译开关至 defconfig"
+          echo "6. 追加 SUSFS 编译开关至 defconfig"
           echo "========================================"
 
           CONFIG_LIST="

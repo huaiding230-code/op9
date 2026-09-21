@@ -78,7 +78,7 @@ jobs:
             echo "[+] 还原 DTS 目录中的 Makefile 至干净状态"
             git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
 
-            echo "[+] 精准清理变量赋值行（如 dtbo-y +=）前面的空白符"
+            echo "[+] 精准清理变量赋值行前面的空白符"
             find arch/arm64/boot/dts/vendor/oplus/ -name "Makefile" -exec sed -i 's/^[ \t]*\([a-zA-Z0-9_\-]\+[ \t]*[+:=]\)/\1/' {} +
           fi
 
@@ -90,7 +90,7 @@ jobs:
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
+          echo "5. 应用 5.4 内核 SUSFS VFS 补丁与 sys.c 兼容修复"
           echo "========================================"
 
           SUSFS_PATCH=$(find /tmp/susfs4ksu -type f \( -name "*5.4*.patch" -o -name "*vfs*.patch" \) | head -n 1 || true)
@@ -100,6 +100,12 @@ jobs:
             patch -p1 < "$SUSFS_PATCH" || { echo "WARNING: Patch 对齐存在部分 conflict，将继续编译运行"; }
           else
             echo "WARNING: 未在仓库中找到独立 .patch 文件，跳过 patch -p1 步骤"
+          fi
+
+          # 修复 Clang 下 override_custom_release -Werror=unused-function 报错
+          if grep -q "override_custom_release" kernel/sys.c; then
+            echo "[+] 为 kernel/sys.c 添加 __maybe_unused 修复 Clang 编译报错"
+            sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c
           fi
 
           if ! grep -q "susfs.o" fs/Makefile; then
@@ -148,7 +154,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS + 精准 DTS 修复完成！"
+          echo "SukiSU Ultra + SUSFS 集成与 sys.c 修复完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

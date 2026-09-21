@@ -71,7 +71,7 @@ jobs:
             echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
-          # 2) 穿透软链接定位 pkg_observer.c 真实物理路径并精准修复 5.4 fsnotify 接口
+          # 2) 穿透软链接定位 pkg_observer.c 并修复 5.4 fsnotify 接口
           RAW_OBSERVER=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$RAW_OBSERVER" ]; then
             PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
@@ -80,6 +80,17 @@ jobs:
               echo "[+] 修改 $PKG_OBSERVER 以适配 Linux 5.4 fsnotify 结构体"
               sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
               sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
+            fi
+          fi
+
+          # 3) 穿透软链接定位 allowlist.c 并修复 Linux 5.4 下的 TWA_RESUME 与 put_task_struct 声明
+          RAW_ALLOWLIST=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "allowlist.c" 2>/dev/null | head -n 1 || true)
+          if [ -n "$RAW_ALLOWLIST" ]; then
+            ALLOWLIST=$(readlink -f "$RAW_ALLOWLIST")
+            echo "[+] 找到 allowlist.c 真实物理路径: $ALLOWLIST"
+            if [ -f "$ALLOWLIST" ]; then
+              echo "[+] 修复 $ALLOWLIST 的 Linux 5.4 TWA_RESUME 与 put_task_struct 缺失"
+              sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME true\n#endif' "$ALLOWLIST"
             fi
           fi
 
@@ -154,7 +165,7 @@ jobs:
           done
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 彻底适配完成！"
+          echo "SukiSU Ultra + SUSFS 适配完成！"
           echo "========================================"
           
       - name: Build Integrated Kernel

@@ -117,8 +117,8 @@ jobs:
               sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
           fi
 
-          # 3.7 强制移除顶级 Makefile 中的 -Werror
-          sed -i 's/-Werror//g' Makefile
+          # 3.7 仅精准移除独立出现的 -Werror 标志，避免破坏 -Werror=xxx 格式的编译选项
+          sed -i 's/\b-Werror\b/ /g' Makefile || true
 
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"

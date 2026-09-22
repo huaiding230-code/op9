@@ -103,12 +103,12 @@ jobs:
               sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 使用官方 KernelSU 5.4 兼容的 SELinux 模块替换
-          echo "[+] 正在使用 5.4 兼容的 SELinux 驱动模块进行替换..."
-          rm -rf drivers/kernelsu/selinux
-          git clone --depth=1 https://github.com/tiann/KernelSU.git /tmp/ksu_official
-          cp -r /tmp/ksu_official/kernel/selinux drivers/kernelsu/
-          rm -rf /tmp/ksu_official
+          # 3.4 使用官方 KernelSU v0.9.5 兼容的 SELinux 模块替换
+          # echo "[+] 正在使用 v0.9.5 兼容的 SELinux 驱动模块进行替换..."
+          # rm -rf drivers/kernelsu/selinux
+          # git clone --depth=1 -b v0.9.5 https://github.com/tiann/KernelSU.git /tmp/ksu_official
+          # cp -r /tmp/ksu_official/kernel/selinux drivers/kernelsu/
+          # rm -rf /tmp/ksu_official
 
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
           if [ -f "drivers/iommu/iommu-debug.c" ]; then

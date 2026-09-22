@@ -37,9 +37,9 @@ jobs:
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
 
-          # 清空 lemonadev 的 Makefile，防止其编译报错，不影响 9 Pro 和 9 标准版
+          # 给 lemonadev/Makefile 写入空目标，避免 Kbuild 报 No targets 错误
           if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
-              echo "" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
+              echo "obj-y :=" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
           fi
 
           export ARCH=arm64
@@ -121,7 +121,7 @@ jobs:
           echo "========================================"
           if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
               echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
-              patch -p1 --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
+              patch -p1 --batch -N --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
           else
               echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
           fi

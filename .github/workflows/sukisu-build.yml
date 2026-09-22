@@ -103,11 +103,13 @@ jobs:
               sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 适配 5.4 内核 SELinux 结构体 (将 5.7+ 的 selinux_policy/.policy 替换为 5.4 的 selinux_ss/.ss)
+          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (5.4 无 selinux_policy/.policy 及 policy_mutex)
           echo "[+] 替换 SELinux 模块中的 5.7+ 结构体与字段名称为 5.4 兼容格式"
           if [ -d "drivers/kernelsu/selinux" ]; then
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/\bselinux_policy\b/selinux_ss/g' {} +
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/\.policy\b/.ss/g' {} +
+              find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/\/* mutex_lock *\/;/g' {} +
+              find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/\/* mutex_unlock *\/;/g' {} +
           fi
 
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏

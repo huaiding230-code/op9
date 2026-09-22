@@ -23,16 +23,20 @@ jobs:
         run: |
           mkdir -p toolchain
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/proton-clang
-
+          echo "${GITHUB_WORKSPACE}/toolchain/proton-clang/bin" >> $GITHUB_PATH
+          
       - name: Integrate SukiSU Ultra + SUSFS
         run: |
           set -euo pipefail
-          
-          CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
-          export PATH="${CLANG_DIR}/bin:${PATH}"
-
           cd kernel_source
 
+          echo "========================================"
+          echo "2. 还原 DTS 目录"
+          echo "========================================"
+          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
+            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
+          fi
+          
           # 修复 DTS Makefile 中开头的 8 个空格误转问题，自动替换回标准的 TAB 键
           find arch/arm64/boot/dts/ -name "Makefile" -exec sed -i 's/^        /\t/g' {} +
 
@@ -57,13 +61,6 @@ jobs:
           git clone --depth=1 -b kernel-5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
           git clone --depth=1 -b 5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
           git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
-
-          echo "========================================"
-          echo "2. 还原 DTS 目录"
-          echo "========================================"
-          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
-          fi
 
           echo "========================================"
           echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"

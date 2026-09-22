@@ -33,9 +33,7 @@ jobs:
           echo "========================================"
           echo "2. 还原 DTS 目录"
           echo "========================================"
-          if [ -d "arch/arm64/boot/dts/vendor/oplus" ]; then
-            git checkout -- arch/arm64/boot/dts/vendor/oplus/ || true
-          fi
+          git checkout -- arch/arm64/boot/dts/ || true
           
           # 修复 DTS Makefile 中开头的 8 个空格误转问题，自动替换回标准的 TAB 键
           find arch/arm64/boot/dts/ -name "Makefile" -exec sed -i 's/^        /\t/g' {} +

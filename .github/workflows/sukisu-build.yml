@@ -71,7 +71,12 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 3.1 自动补齐 5.4 内核缺失的 linux/pgtable.h
+          # 3.1 解除 net/Kconfig 中 CONFIG_RPS 的隐藏限制并补齐 linux/pgtable.h
+          if [ -f "net/Kconfig" ]; then
+              echo "[+] 解除 net/Kconfig 中 CONFIG_RPS 的隐藏限制"
+              sed -i 's/config RPS/config RPS\n\tbool "RPS support"/g' net/Kconfig
+          fi
+
           if [ ! -f "include/linux/pgtable.h" ]; then
               echo "[+] 创建 linux/pgtable.h 兼容垫片"
               mkdir -p include/linux
@@ -117,7 +122,7 @@ jobs:
               sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
           fi
 
-          # 3.7 递归清理源码树（含 techpack 等驱动）子 Makefile 中的 -Werror
+          # 3.7 递归清理源码树（含 techpack 等子驱动）Makefile 中的 -Werror
           find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
           echo "========================================"
@@ -222,9 +227,21 @@ jobs:
             O="${OUT_DIR}" \
             "${DEFCONFIG_TARGET}"
 
-          # 强制补填兜底，确保校验必通过
+          # 强制补填兜底并刷新配置文件
+          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
+
+          make \
+            ARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CC=clang \
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function" \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            O="${OUT_DIR}" \
+            olddefconfig
 
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"

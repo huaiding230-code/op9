@@ -135,20 +135,20 @@ jobs:
           fi
 
           # 3.6 修复 qcom_scm.h 空桩函数缺少 return 语法
-          if [ -f "include/linux/qcom_scm.h" ]; then
-              echo "[+] 修复 qcom_scm.h 非 void 函数缺失 return 问题"
-              sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
-          fi
+          # if [ -f "include/linux/qcom_scm.h" ]; then
+          #     echo "[+] 修复 qcom_scm.h 非 void 函数缺失 return 问题"
+          #     sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
+          # fi
 
           # 3.7 递归清理源码树（含 techpack 等子驱动）Makefile 中的 -Werror
           find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
           # 3.8 修复 msm_performance.c 缺失 cpufreq.h 头文件
-          MSM_PERF="drivers/soc/qcom/msm_performance.c"
-          if [ -f "$MSM_PERF" ]; then
-              echo "[+] 修复 msm_performance.c 头文件缺失"
-              sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" 2>/dev/null || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
-          fi
+          # MSM_PERF="drivers/soc/qcom/msm_performance.c"
+          # if [ -f "$MSM_PERF" ]; then
+          #     echo "[+] 修复 msm_performance.c 头文件缺失"
+          #     sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" 2>/dev/null || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
+          # fi
 
           # 3.9 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 宏声明
           echo "[+] 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 声明"
@@ -186,10 +186,10 @@ jobs:
           fi
 
           # 修复 kernel/sys.c 的 Clang 警告报错
-          if [ -f "kernel/sys.c" ]; then
-              sed -i '1i #pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-variable"' kernel/sys.c
-              sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c || true
-          fi
+          # if [ -f "kernel/sys.c" ]; then
+          #     sed -i '1i #pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-variable"' kernel/sys.c
+          #     sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c || true
+          # fi
 
           # 追加 Makefile 和 Kconfig
           if ! grep -q "susfs.o" fs/Makefile; then

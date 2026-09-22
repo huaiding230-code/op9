@@ -125,9 +125,10 @@ jobs:
           # 3.4.5 修复 fair.c 缺失 sched_energy_present 变量的编译错误
           echo "[+] 修补 fair.c 能量模型兼容性"
           if [ -f "kernel/sched/fair.c" ]; then
-          sed -i 's/static_branch_unlikely(&sched_energy_present)/sched_energy_enabled()/g' kernel/sched/fair.c
+          sed -i -E 's/static_branch_unlikely\([[:space:]]*&sched_energy_present[[:space:]]*\)/sched_energy_enabled()/g' kernel/sched/fair.c
+          sed -i 's/&sched_energy_present/NULL/g' kernel/sched/fair.c
           fi
-          
+            
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
           if [ -f "drivers/iommu/iommu-debug.c" ]; then
               echo "[+] 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明"
@@ -261,6 +262,8 @@ jobs:
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_ENERGY_MODEL=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_SCHED_ENERGY=y" >> "${OUT_DIR}/.config"
 
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
 

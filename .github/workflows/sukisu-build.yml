@@ -94,15 +94,16 @@ jobs:
             sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 修复 rules.c (5.4 内核 SELinux 锁机制)
-          RAW_RULES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "rules.c" 2>/dev/null | head -n 1 || true)
-          if [ -n "$RAW_RULES" ]; then
+          # 3.4 修复 rules.c (5.4 内核 SELinux 锁机制与结构体)
+        RAW_RULES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "rules.c" 2>/dev/null | head -n 1 || true)
+        if [ -n "$RAW_RULES" ]; then
             RULES_FILE=$(readlink -f "$RAW_RULES")
             echo "[+] 找到 rules.c: $RULES_FILE，修正 5.4 SELinux 锁"
             sed -i 's/mutex_lock(&selinux_state.ss_mutex);/write_lock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
             sed -i 's/mutex_unlock(&selinux_state.ss_mutex);/write_unlock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
             sed -i 's/selinux_state.ss_mutex/selinux_state.ss->policy_lock/g' "$RULES_FILE" || true
-          fi
+            sed -i 's/selinux_state\.policy/selinux_state.ss->policy/g' "$RULES_FILE" || true
+        fi
 
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"

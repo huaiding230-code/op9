@@ -119,13 +119,6 @@ jobs:
                   sed -i 's/trans->stypes/trans->otype/g' "$SEPOLICY_FILE"
               fi
           fi
-              # 适配 sepolicy.c 在 5.4 内核中的 filename_trans 结构体
-              if [ -f "drivers/kernelsu/selinux/sepolicy.c" ]; then
-                  sed -i '1i #include <linux/version.h>\n#include "ss/policydb.h"' drivers/kernelsu/selinux/sepolicy.c || true
-                  sed -i 's/ebitmap_set_bit(&trans->stypes, \(.*\)- 1, 1)/(trans->otype = \1, 0)/g' drivers/kernelsu/selinux/sepolicy.c
-                  sed -i 's/trans->stypes/trans->otype/g' drivers/kernelsu/selinux/sepolicy.c
-              fi
-          fi
 
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
           if [ -f "drivers/iommu/iommu-debug.c" ]; then

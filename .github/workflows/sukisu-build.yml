@@ -134,7 +134,7 @@ jobs:
           MSM_PERF="drivers/soc/qcom/msm_performance.c"
           if [ -f "$MSM_PERF" ]; then
               echo "[+] 修复 msm_performance.c 头文件缺失"
-              sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
+              sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
           fi
           
           echo "========================================"
@@ -233,7 +233,7 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function" \
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             O="${OUT_DIR}" \
@@ -252,7 +252,7 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function" \
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             O="${OUT_DIR}" \
@@ -271,7 +271,7 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function" \
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             O="${OUT_DIR}" \

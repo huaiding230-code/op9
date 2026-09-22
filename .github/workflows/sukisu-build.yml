@@ -109,7 +109,7 @@ jobs:
 
           if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
             echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
-            patch -p1 --fuzz=3 < patch/50_add_susfs_in_kernel-5.4.patch
+            patch -p1 --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
           else
             echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
           fi

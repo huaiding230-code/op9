@@ -105,6 +105,12 @@ jobs:
           cp -r /tmp/ksu_official/kernel/selinux drivers/kernelsu/
           rm -rf /tmp/ksu_official
 
+          # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
+          if [ -f "drivers/iommu/iommu-debug.c" ]; then
+              echo "[+] 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明"
+              sed -i '1i #ifndef CONFIG_IOMMU_IOVA_ALIGNMENT\n#define CONFIG_IOMMU_IOVA_ALIGNMENT 0\n#endif' drivers/iommu/iommu-debug.c
+          fi
+          
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"
           echo "========================================"

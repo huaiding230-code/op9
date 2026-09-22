@@ -98,23 +98,25 @@ jobs:
               sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (彻底切除 5.7+ filename_trans 废代码)
+          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (处理 selinux 目录下所有 .c/.h 文件)
           echo "[+] 适配 SELinux 模块 5.4 内核兼容性"
-          SEPOLICY_LIST=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "sepolicy.c" 2>/dev/null | sort -u || true)
-          for raw_f in $SEPOLICY_LIST; do
+          SELINUX_FILES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -path "*/selinux/*" \( -name "*.c" -o -name "*.h" \) 2>/dev/null | sort -u || true)
+          for raw_f in $SELINUX_FILES; do
           f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
           if [ -f "$f" ]; then
-            echo "[+] 正在处理 sepolicy.c: $f"
+            echo "[+] 正在处理 SELinux 文件: $f"
             sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
             sed -i 's/\.policy\b/.ss/g' "$f"
             sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
             sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
             grep -q "ss/policydb.h" "$f" || sed -i '1i #include <linux/types.h>\n#include "ss/policydb.h"' "$f"
-            sed -i '/filename_trans/,$d' "$f"
-            echo "" >> "$f"
-            echo "bool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) {" >> "$f"
-            echo "    return true;" >> "$f"
-            echo "}" >> "$f"
+            if echo "$f" | grep -q "sepolicy.c"; then
+              sed -i '/filename_trans/,$d' "$f"
+              echo "" >> "$f"
+              echo "bool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) {" >> "$f"
+              echo "    return true;" >> "$f"
+              echo "}" >> "$f"
+            fi
           fi
           done
 

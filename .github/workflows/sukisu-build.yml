@@ -121,6 +121,12 @@ jobs:
               fi
             fi
           done
+
+          # 3.4.5 修复 fair.c 缺失 sched_energy_present 变量的编译错误
+          echo "[+] 修补 fair.c 能量模型兼容性"
+          if [ -f "kernel/sched/fair.c" ]; then
+          sed -i 's/static_branch_unlikely(&sched_energy_present)/sched_energy_enabled()/g' kernel/sched/fair.c
+          fi
           
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
           if [ -f "drivers/iommu/iommu-debug.c" ]; then

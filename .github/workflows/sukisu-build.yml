@@ -71,58 +71,53 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 3.1 补齐 linux/pgtable.h 兼容垫片
-          if [ ! -f "include/linux/pgtable.h" ]; then
-              echo "[+] 创建 linux/pgtable.h 兼容垫片"
-              mkdir -p include/linux
-              echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
+          # 3.1 补齐 5.4 内核全局垫片文件 (include/linux/)
+          echo "[+] 创建全局 5.4 内核兼容垫片文件"
+          mkdir -p include/linux
+          [ ! -f "include/linux/pgtable.h" ] && echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
+          [ ! -f "include/linux/minmax.h" ] && echo "#include <linux/kernel.h>" > include/linux/minmax.h
+
+          # 3.2 创建 KSU 驱动全局预编译头文件 ksu_compat.h
+          echo "[+] 创建 drivers/kernelsu 全局兼容头文件 ksu_compat.h"
+          mkdir -p drivers/kernelsu
+          echo '#ifndef _KSU_COMPAT_H' > drivers/kernelsu/ksu_compat.h
+          echo '#define _KSU_COMPAT_H' >> drivers/kernelsu/ksu_compat.h
+          echo '' >> drivers/kernelsu/ksu_compat.h
+          echo '#include <linux/types.h>' >> drivers/kernelsu/ksu_compat.h
+          echo '#include <linux/kernel.h>' >> drivers/kernelsu/ksu_compat.h
+          echo '#include <linux/sched/task.h>' >> drivers/kernelsu/ksu_compat.h
+          echo '#include <linux/task_work.h>' >> drivers/kernelsu/ksu_compat.h
+          echo '' >> drivers/kernelsu/ksu_compat.h
+          echo '#ifndef TWA_RESUME' >> drivers/kernelsu/ksu_compat.h
+          echo '#define TWA_RESUME 1' >> drivers/kernelsu/ksu_compat.h
+          echo '#endif' >> drivers/kernelsu/ksu_compat.h
+          echo '' >> drivers/kernelsu/ksu_compat.h
+          echo '#endif' >> drivers/kernelsu/ksu_compat.h
+
+          # 3.3 在 KSU Makefile 顶层强行全局预载 (-include) ksu_compat.h
+          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/dev/null | head -n 1 || true)
+          if [ -n "$KSU_MAKEFILE" ] && [ -f "$KSU_MAKEFILE" ]; then
+            echo "[+] 注入 ccflags-y 全局预加载选项到 $KSU_MAKEFILE"
+            sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
           fi
 
-          # 3.2 修复 pkg_observer.c (5.4 fsnotify 接口)
-          RAW_OBSERVER=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
-          if [ -n "$RAW_OBSERVER" ]; then
-              PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
-              echo "[+] 找到 pkg_observer.c: $PKG_OBSERVER"
-              if [ -f "$PKG_OBSERVER" ] && grep -q "handle_inode_event" "$PKG_OBSERVER"; then
-                  echo "[+] 适配 5.4 fsnotify 结构体"
-                  sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
-                  sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
+          # 3.4 无死角全盘递归适配 drivers/kernelsu 目录下所有源码
+          echo "[+] 全盘递归适配 SELinux 与 5.4 语法兼容性"
+          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
+            f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
+            if [ -f "$f" ]; then
+              sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
+              sed -i 's/\.policy\b/.ss/g' "$f"
+              sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
+              sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
+              grep -q "ss/policydb.h" "$f" || sed -i '1i #include <linux/types.h>\n#include "ss/policydb.h"' "$f"
+              if echo "$f" | grep -q "sepolicy.c"; then
+                sed -i '/filename_trans/,$d' "$f"
+                echo -e '\nbool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) {\n    return true;\n}' >> "$f"
               fi
-          fi
-
-          # 3.3 修复 5.4 缺失 TWA_RESUME 与 task.h（全域扫描 drivers/kernelsu）
-          echo "[+] 全局扫描并补全 5.4 缺失的 TWA_RESUME 与 task.h 头文件"
-          TWA_FILES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | xargs grep -l "TWA_RESUME" 2>/dev/null || true)
-          for raw_f in $TWA_FILES; do
-          f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
-          if [ -f "$f" ]; then
-            echo "[+] 正在为 $f 补充 TWA_RESUME 兼容定义"
-            grep -q "#define TWA_RESUME" "$f" || sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$f"
-          fi
-          done
-
-          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (处理 selinux 目录下所有 .c/.h 文件)
-          echo "[+] 适配 SELinux 模块 5.4 内核兼容性"
-          SELINUX_FILES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -path "*/selinux/*" \( -name "*.c" -o -name "*.h" \) 2>/dev/null | sort -u || true)
-          for raw_f in $SELINUX_FILES; do
-          f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
-          if [ -f "$f" ]; then
-            echo "[+] 正在处理 SELinux 文件: $f"
-            sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
-            sed -i 's/\.policy\b/.ss/g' "$f"
-            sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-            sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-            grep -q "ss/policydb.h" "$f" || sed -i '1i #include <linux/types.h>\n#include "ss/policydb.h"' "$f"
-            if echo "$f" | grep -q "sepolicy.c"; then
-              sed -i '/filename_trans/,$d' "$f"
-              echo "" >> "$f"
-              echo "bool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) {" >> "$f"
-              echo "    return true;" >> "$f"
-              echo "}" >> "$f"
             fi
-          fi
           done
-
+          
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
           if [ -f "drivers/iommu/iommu-debug.c" ]; then
               echo "[+] 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明"

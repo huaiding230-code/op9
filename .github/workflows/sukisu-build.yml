@@ -299,6 +299,11 @@ jobs:
           if [ -f "drivers/virt/haven/hh_dbl.c" ]; then
               sed -i '1i#include <linux/sched.h>' drivers/virt/haven/hh_dbl.c
           fi
+
+          # === [新增] 修復 qc_vas.c 缺少 NOHZ_KICK_MASK 標識符的問題 ===
+          if [ -f "kernel/sched/walt/qc_vas.c" ]; then
+              sed -i '1i#include "../sched.h"' kernel/sched/walt/qc_vas.c
+          fi
           
           # === [新增] 强制开启 KPM 与动态模块支持 ===
           #echo "[+] 正在向 .config 写入 KPM 编译配置..."

@@ -33,13 +33,13 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "清理并仅保留 9 Pro (lemonadep) 设备树"
+          echo "2. 清理并禁用无关的 lemonadev 设备树"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
-          
-          # 从 OPlus DTS Makefile 中删掉 lemonadev 等无关机型的编译入口
-          if [ -f "arch/arm64/boot/dts/vendor/oplus/Makefile" ]; then
-              sed -i '/lemonadev/d' arch/arm64/boot/dts/vendor/oplus/Makefile || true
+
+          # 清空 lemonadev 的 Makefile，防止其编译报错，不影响 9 Pro 和 9 标准版
+          if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
+              echo "" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
           fi
 
           export ARCH=arm64
@@ -98,15 +98,12 @@ jobs:
               sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 修复 rules.c (适用于 5.4 内核 SELinux 锁机制)
-          RAW_RULES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "rules.c" 2>/dev/null | head -n 1 || true)
-          if [ -n "$RAW_RULES" ]; then
-              RULES_FILE=$(readlink -f "$RAW_RULES")
-              echo "[+] 找到 rules.c: $RULES_FILE，修正 5.4 SELinux 锁机制"
-              sed -i 's/mutex_lock(&selinux_state.ss_mutex);/write_lock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
-              sed -i 's/mutex_unlock(&selinux_state.ss_mutex);/write_unlock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
-              sed -i 's/selinux_state.ss_mutex/selinux_state.ss->policy_lock/g' "$RULES_FILE" || true
-          fi
+          # 3.4 使用官方 KernelSU 5.4 兼容的 SELinux 模块替换
+          echo "[+] 正在使用 5.4 兼容的 SELinux 驱动模块进行替换..."
+          rm -rf drivers/kernelsu/selinux
+          git clone --depth=1 https://github.com/tiann/KernelSU.git /tmp/ksu_official
+          cp -r /tmp/ksu_official/kernel/selinux drivers/kernelsu/
+          rm -rf /tmp/ksu_official
 
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"

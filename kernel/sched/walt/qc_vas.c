@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  */
+#include "../sched.h"
 #include <linux/irq.h>
 #include <linux/delay.h>
 #include <trace/events/sched.h>

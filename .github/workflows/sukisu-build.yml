@@ -56,8 +56,8 @@ jobs:
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
 
           # 1.1 克隆 SukiSU Ultra
-          git clone --depth=1 -b kernel-5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
-          git clone --depth=1 -b 5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          # git clone --depth=1 -b kernel-5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          # git clone --depth=1 -b 5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 https://github.com/huaiding230-code/SukiSU-Ultra.git /tmp/SukiSU-Ultra
           
           # # === [纯 Shell] 修补 pkg_observer.c 适配 Linux 5.4 fsnotify ===

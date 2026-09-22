@@ -79,24 +79,22 @@ jobs:
           # 3.1 补齐 5.4 内核全局垫片文件 (include/linux/)
           echo "[+] 创建全局 5.4 内核兼容垫片文件"
           mkdir -p include/linux
-          [ ! -f "include/linux/pgtable.h" ] && echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
-          [ ! -f "include/linux/minmax.h" ] && echo "#include <linux/kernel.h>" > include/linux/minmax.h
+          # [ ! -f "include/linux/pgtable.h" ] && echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
+          # [ ! -f "include/linux/minmax.h" ] && echo "#include <linux/kernel.h>" > include/linux/minmax.h
 
           # 3.2 创建 KSU 驱动全局预编译头文件 ksu_compat.h
           echo "[+] 创建 drivers/kernelsu 全局兼容头文件 ksu_compat.h"
           mkdir -p drivers/kernelsu
           echo '#ifndef _KSU_COMPAT_H' > drivers/kernelsu/ksu_compat.h
           echo '#define _KSU_COMPAT_H' >> drivers/kernelsu/ksu_compat.h
-          echo '' >> drivers/kernelsu/ksu_compat.h
           echo '#include <linux/types.h>' >> drivers/kernelsu/ksu_compat.h
           echo '#include <linux/kernel.h>' >> drivers/kernelsu/ksu_compat.h
+          echo '#include <asm/pgtable.h>' >> drivers/kernelsu/ksu_compat.h
           echo '#include <linux/sched/task.h>' >> drivers/kernelsu/ksu_compat.h
           echo '#include <linux/task_work.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '' >> drivers/kernelsu/ksu_compat.h
           echo '#ifndef TWA_RESUME' >> drivers/kernelsu/ksu_compat.h
           echo '#define TWA_RESUME 1' >> drivers/kernelsu/ksu_compat.h
           echo '#endif' >> drivers/kernelsu/ksu_compat.h
-          echo '' >> drivers/kernelsu/ksu_compat.h
           echo '#endif' >> drivers/kernelsu/ksu_compat.h
 
           # 3.3 在 KSU Makefile 顶层强行全局预载 (-include) ksu_compat.h
@@ -160,11 +158,11 @@ jobs:
           fi
 
           # 3.10 补齐 5.4 内核缺失的 linux/minmax.h 垫片
-          if [ ! -f "include/linux/minmax.h" ]; then
-          echo "[+] 创建 linux/minmax.h 兼容垫片"
-          mkdir -p include/linux
-          echo "#include <linux/kernel.h>" > include/linux/minmax.h
-          fi
+          # if [ ! -f "include/linux/minmax.h" ]; then
+          # echo "[+] 创建 linux/minmax.h 兼容垫片"
+          # mkdir -p include/linux
+          # echo "#include <linux/kernel.h>" > include/linux/minmax.h
+          # fi
         
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"
@@ -263,6 +261,8 @@ jobs:
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_ENERGY_MODEL=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_SCHED_ENERGY=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_BLK_INLINE_ENCRYPTION=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_BLK_INLINE_ENCRYPTION_FALLBACK=y" >> "${OUT_DIR}/.config"
 
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
 

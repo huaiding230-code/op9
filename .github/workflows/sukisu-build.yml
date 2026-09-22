@@ -117,8 +117,8 @@ jobs:
               sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
           fi
 
-          # 3.7 仅精准移除独立出现的 -Werror 标志，避免破坏 -Werror=xxx 格式的编译选项
-          sed -i 's/\b-Werror\b/ /g' Makefile || true
+          # 3.7 递归清理源码树（含 techpack 等驱动）子 Makefile 中的 -Werror
+          find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"
@@ -159,6 +159,7 @@ jobs:
           echo "6. 配置 defconfig 开关"
           echo "========================================"
           CONFIG_LIST="
+          CONFIG_RPS=y
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_SUS_PATH=y

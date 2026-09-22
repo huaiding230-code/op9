@@ -71,9 +71,10 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 3.1 递归解除 net/ 目录下所有 Kconfig 中 CONFIG_RPS 的隐藏限制并补齐 linux/pgtable.h
-          echo "[+] 解除 net/ 目录下 CONFIG_RPS 的隐藏限制"
-          find net -type f -name "Kconfig*" -exec sed -i 's/config RPS/config RPS\n\tbool "RPS support"\n\tdefault y/g' {} +
+          # 3.1 全局强制开启 CONFIG_RPS 并补齐 linux/pgtable.h
+          echo "[+] 强制解封并启用 CONFIG_RPS"
+          sed -i 's/config RPS/config RPS\n\tdefault y/g' net/core/Kconfig 2>/dev/null || true
+          sed -i '/config ARM64/a \tselect RPS' arch/arm64/Kconfig
 
           if [ ! -f "include/linux/pgtable.h" ]; then
               echo "[+] 创建 linux/pgtable.h 兼容垫片"

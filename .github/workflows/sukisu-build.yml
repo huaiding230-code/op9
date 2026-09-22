@@ -106,23 +106,12 @@ jobs:
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-          echo "[+] 当前拉取到的补丁文件清单："
-          find /tmp/susfs4ksu -type f -name "*.patch" || true
 
-          # 排除 4.14 / 4.19 补丁，精准获取 5.4 补丁
-          SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" ! -name "*4.14*" ! -name "*4.19*" | grep -iE "5[\._]4|vfs|susfs" | head -n 1 || true)
-
-          # 备选匹配：选择任意非 4.x 的 patch 文件
-          if [ -z "$SUSFS_PATCH" ]; then
-            SUSFS_PATCH=$(find /tmp/susfs4ksu -type f -name "*.patch" ! -name "*4.14*" ! -name "*4.19*" | head -n 1 || true)
-          fi
-
-          if [ -n "$SUSFS_PATCH" ] && [ -f "$SUSFS_PATCH" ]; then
-            echo "[+] 成功定位到目标补丁: $SUSFS_PATCH"
-            patch -p1 < "$SUSFS_PATCH" || { echo "[-] 警告: 部分补丁打入有冲突，尝试继续"; }
+          if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
+            echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
+            patch -p1 --fuzz=3 < patch/50_add_susfs_in_kernel-5.4.patch
           else
-            echo "[-] 致命错误: 未找到适用于 5.4 内核的 VFS 补丁！"
-            exit 1
+            echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
           fi
 
           # 修复 kernel/sys.c 的 Clang 声明报错

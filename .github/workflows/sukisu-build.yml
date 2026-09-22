@@ -33,9 +33,14 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "还原 DTS 目录"
+          echo "清理并仅保留 9 Pro (lemonadep) 设备树"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
+          
+          # 从 OPlus DTS Makefile 中删掉 lemonadev 等无关机型的编译入口
+          if [ -f "arch/arm64/boot/dts/vendor/oplus/Makefile" ]; then
+              sed -i '/lemonadev/d' arch/arm64/boot/dts/vendor/oplus/Makefile || true
+          fi
 
           export ARCH=arm64
           export SUBARCH=arm64

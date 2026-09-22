@@ -65,12 +65,13 @@ jobs:
           echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
+          sed -i 's/\.handle_inode_event/\.handle_event/g' drivers/kernelsu/manager/pkg_observer.c
 
-          # 3.0 强制修正 drivers/kernelsu 内部 pkg_observer.c 适配 Linux 5.4 fsnotify
-          echo "[+] 正在强行将 pkg_observer.c 适配为 5.4 签名"
-          find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/\.handle_inode_event/.handle_event/g' {} +
-          find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/ksu_handle_inode_event/ksu_handle_event/g' {} +
-          find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/struct fsnotify_mark \*mark, u32 mask, struct inode \*inode, struct inode \*dir, const struct qstr \*file_name, u32 cookie/struct fsnotify_group *group, struct inode *inode, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info/g' {} + 
+          # # 3.0 强制修正 drivers/kernelsu 内部 pkg_observer.c 适配 Linux 5.4 fsnotify
+          # echo "[+] 正在强行将 pkg_observer.c 适配为 5.4 签名"
+          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/\.handle_inode_event/.handle_event/g' {} +
+          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/ksu_handle_inode_event/ksu_handle_event/g' {} +
+          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/struct fsnotify_mark \*mark, u32 mask, struct inode \*inode, struct inode \*dir, const struct qstr \*file_name, u32 cookie/struct fsnotify_group *group, struct inode *inode, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info/g' {} + 
           
           # 3.1 补齐 5.4 内核全局垫片文件 (include/linux/)
           echo "[+] 创建全局 5.4 内核兼容垫片文件"

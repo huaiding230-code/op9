@@ -65,7 +65,6 @@ jobs:
           echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
-          bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
           # 将 pkg_observer.c 直接替换为干净的兼容桩，彻底解决签名冲突
           cat << 'EOF' > drivers/kernelsu/manager/pkg_observer.c

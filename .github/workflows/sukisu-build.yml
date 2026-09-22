@@ -141,7 +141,14 @@ jobs:
               echo "[+] 修复 msm_performance.c 头文件缺失"
               sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" 2>/dev/null || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
           fi
-          
+
+          # 3.9 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 宏声明
+          echo "[+] 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 声明"
+          QC_VAS=$(find . -name "qc_vas.c" 2>/dev/null | head -n 1)
+          if [ -n "$QC_VAS" ] && [ -f "$QC_VAS" ]; then
+            sed -i 's/\bNOHZ_KICK_MASK\b/0x3/g' "$QC_VAS"
+          fi
+        
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"
           echo "========================================"

@@ -111,7 +111,7 @@ jobs:
           if [ -f "$SEPOLICY_FILE" ]; then
             sed -i '1i #include <linux/types.h>\n#include "ss/policydb.h"' "$SEPOLICY_FILE"
             # 裁切 5.7+ 的 ksu_allow_filename_trans 代码块并追加 5.4 兼容空桩
-            sed -i '/bool ksu_allow_filename_trans/, $d' "$SEPOLICY_FILE"
+            sed -i '/bool ksu_allow_filename_trans/,$d' "$SEPOLICY_FILE"
             echo 'bool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) { return true; }' >> "$SEPOLICY_FILE"
           fi
           fi

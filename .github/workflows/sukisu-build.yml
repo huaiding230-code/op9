@@ -228,35 +228,17 @@ jobs:
           echo "========================================"
           echo "2. 生成内核配置 (.config)"
           echo "========================================"
-          make \
-            ARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            O="${OUT_DIR}" \
-            "${DEFCONFIG_TARGET}"
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
 
-          # 1. 先用目标 defconfig 生成基础 .config，然后强行追加我们需要的开关
+          # 1. 先追加我们需要的配置
           echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
 
-          # 2. 最后再运行 olddefconfig 刷新并补全依赖关系
-          make \
-            ARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            O="${OUT_DIR}" \
-            olddefconfig
+          # 2. 再跑 olddefconfig
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
 
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"

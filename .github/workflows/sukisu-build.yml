@@ -149,19 +149,19 @@ jobs:
           # 3.7 递归清理源码树（含 techpack 等子驱动）Makefile 中的 -Werror
           find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
-          # 3.8 修复 msm_performance.c 缺失 cpufreq.h 头文件
+          # # 3.8 修复 msm_performance.c 缺失 perf_event.h 头文件
           # MSM_PERF="drivers/soc/qcom/msm_performance.c"
           # if [ -f "$MSM_PERF" ]; then
-          #     echo "[+] 修复 msm_performance.c 头文件缺失"
-          #     sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" 2>/dev/null || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
+          # echo "[+] 修复 msm_performance.c 头文件缺失"
+          # sed -i '1i #include <linux/perf_event.h>' "$MSM_PERF"
           # fi
 
-          # 3.9 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 宏声明
-          echo "[+] 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 声明"
-          QC_VAS=$(find . -name "qc_vas.c" 2>/dev/null | head -n 1)
-          if [ -n "$QC_VAS" ] && [ -f "$QC_VAS" ]; then
-            sed -i 's/\bNOHZ_KICK_MASK\b/0x3/g' "$QC_VAS"
-          fi
+          # # 3.9 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 宏声明
+          # echo "[+] 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 声明"
+          # QC_VAS=$(find . -name "qc_vas.c" 2>/dev/null | head -n 1)
+          # if [ -n "$QC_VAS" ] && [ -f "$QC_VAS" ]; then
+          #   sed -i 's/\bNOHZ_KICK_MASK\b/0x3/g' "$QC_VAS"
+          # fi
 
           # 3.10 补齐 5.4 内核缺失的 linux/minmax.h 垫片
           # if [ ! -f "include/linux/minmax.h" ]; then
@@ -262,23 +262,25 @@ jobs:
           echo "========================================"
           echo "2. 生成内核配置 (.config)"
           echo "========================================"
-          # 2.1 先将配置直接写入源 defconfig 文件，防止被 olddefconfig 抹除
-          TARGET_DEFCONFIG="arch/arm64/configs/${DEFCONFIG_TARGET}"
-          echo "CONFIG_KEYS=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_KEYS_COMPAT=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_KSU=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_KSU_SUSFS=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_ENERGY_MODEL=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_SCHED_ENERGY=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_RPS=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_BLK_INLINE_ENCRYPTION=y" >> "${TARGET_DEFCONFIG}"
-          echo "CONFIG_BLK_INLINE_ENCRYPTION_FALLBACK=y" >> "${TARGET_DEFCONFIG}"
+          # 2.1 生成基础 .config
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
 
-          # 2.2 使用注入后的 defconfig 正式生成初始 .config
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
+          # 2.2 强制将 RPS 与关键配置追加到最终生成的 .config 中
+          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_ENERGY_MODEL=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_SCHED_ENERGY=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_BLK_INLINE_ENCRYPTION=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_BLK_INLINE_ENCRYPTION_FALLBACK=y" >> "${OUT_DIR}/.config"
 
-          # 2.3 自动补齐并刷新配置
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
+          # 2.3 执行 olddefconfig 确认配置并打印检查
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
+
+          # 2.4 打印验证 RPS 状态
+          grep "CONFIG_RPS" "${OUT_DIR}/.config" || true
           
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"

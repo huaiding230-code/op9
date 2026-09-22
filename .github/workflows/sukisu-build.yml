@@ -58,9 +58,14 @@ jobs:
           # 1.1 强制只克隆你自己的 SukiSU-Ultra 仓库（内含已适配 5.4 的源码）
           git clone --depth=1 https://github.com/huaiding230-code/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
+          # === [新增] 自動修復 5.4 內核缺少的 TWA_RESUME 標識符 ===
+          echo "[+] 正在修補 SukiSU 5.4 task_work TWA_RESUME 標識符..."
+          find /tmp/SukiSU-Ultra -type f \( -name "*.c" -o -name "*.h" \) -exec perl -pi -e 's/\bTWA_RESUME\b/true/g' {} +
+          
           # 1.2 强制只克隆你自己的 susfs4ksu 仓库
           git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
 
+     
           echo "========================================"
           echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"
           echo "========================================"

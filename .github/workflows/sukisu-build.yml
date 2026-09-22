@@ -66,6 +66,7 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
           sed -i 's/\.handle_inode_event/\.handle_event/g' drivers/kernelsu/manager/pkg_observer.c
+          sed -i 's/ksu_handle_inode_event/ksu_handle_event/g' drivers/kernelsu/manager/pkg_observer.c
 
           # # 3.0 强制修正 drivers/kernelsu 内部 pkg_observer.c 适配 Linux 5.4 fsnotify
           # echo "[+] 正在强行将 pkg_observer.c 适配为 5.4 签名"

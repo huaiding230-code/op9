@@ -1,10 +1,12 @@
 name: Phase 2 - Integrated SukiSU Ultra + SUSFS Kernel Build
+
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
       - name: Maximize Build Space
         uses: easimon/maximize-build-space@master
@@ -24,19 +26,16 @@ jobs:
           mkdir -p toolchain
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/proton-clang
           echo "${GITHUB_WORKSPACE}/toolchain/proton-clang/bin" >> $GITHUB_PATH
-          
+
       - name: Integrate SukiSU Ultra + SUSFS
         run: |
           set -euo pipefail
           cd kernel_source
 
           echo "========================================"
-          echo "2. 还原 DTS 目录"
+          echo "还原 DTS 目录"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
-          
-          # 修复 DTS Makefile 中开头的 8 个空格误转问题，自动替换回标准的 TAB 键
-          find arch/arm64/boot/dts/ -name "Makefile" -exec sed -i 's/^        /\t/g' {} +
 
           export ARCH=arm64
           export SUBARCH=arm64
@@ -51,10 +50,12 @@ jobs:
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
 
-          # 1.1 克隆 SukiSU Ultra
+          # 1.1 克隆 SukiSU Ultra (优先 5.4 兼容分支)
+          git clone --depth=1 -b kernel-5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          git clone --depth=1 -b 5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
-          # 1.2 从个人 GitHub 仓库拉取 5.4 分支（优先 kernel-5.4，退守 5.4，最后默认分支）
+          # 1.2 从个人 GitHub 仓库拉取 5.4 分支
           echo "[+] 正在从 huaiding230-code/susfs4ksu 拉取补丁..."
           git clone --depth=1 -b kernel-5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
           git clone --depth=1 -b 5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
@@ -67,40 +68,39 @@ jobs:
 
           # 3.1 自动补齐 5.4 内核缺失的 linux/pgtable.h
           if [ ! -f "include/linux/pgtable.h" ]; then
-            echo "[+] 创建 linux/pgtable.h 兼容垫片"
-            mkdir -p include/linux
-            echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
+              echo "[+] 创建 linux/pgtable.h 兼容垫片"
+              mkdir -p include/linux
+              echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
           fi
 
           # 3.2 修复 pkg_observer.c (5.4 fsnotify 接口)
           RAW_OBSERVER=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$RAW_OBSERVER" ]; then
-            PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
-            echo "[+] 找到 pkg_observer.c: $PKG_OBSERVER"
-            if [ -f "$PKG_OBSERVER" ] && grep -q "handle_inode_event" "$PKG_OBSERVER"; then
-              echo "[+] 适配 5.4 fsnotify 结构体"
-              sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
-              sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
-            fi
+              PKG_OBSERVER=$(readlink -f "$RAW_OBSERVER")
+              echo "[+] 找到 pkg_observer.c: $PKG_OBSERVER"
+              if [ -f "$PKG_OBSERVER" ] && grep -q "handle_inode_event" "$PKG_OBSERVER"; then
+                  echo "[+] 适配 5.4 fsnotify 结构体"
+                  sed -i '/struct fsnotify_ops/i static int ksu_handle_event(struct fsnotify_group *group, struct inode *to_tell, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info) { return ksu_handle_inode_event(NULL, mask, to_tell, NULL, file_name, cookie); }' "$PKG_OBSERVER"
+                  sed -i 's/.*\.handle_inode_event.*/\t\.handle_event = ksu_handle_event,/' "$PKG_OBSERVER"
+              fi
           fi
 
           # 3.3 修复 allowlist.c (5.4 缺失 TWA_RESUME 与 task.h)
           RAW_ALLOWLIST=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "allowlist.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$RAW_ALLOWLIST" ]; then
-            ALLOWLIST_FILE=$(readlink -f "$RAW_ALLOWLIST")
-            echo "[+] 找到 allowlist.c: $ALLOWLIST_FILE，补充 5.4 兼容头文件与 TWA_RESUME"
-            sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
+              ALLOWLIST_FILE=$(readlink -f "$RAW_ALLOWLIST")
+              echo "[+] 找到 allowlist.c: $ALLOWLIST_FILE，补充 5.4 兼容头文件与 TWA_RESUME"
+              sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 修复 rules.c (5.4 内核 SELinux 锁机制与结构体)
+          # 3.4 修复 rules.c (适用于 5.4 内核 SELinux 锁机制)
           RAW_RULES=$(find -L drivers/kernelsu /tmp/SukiSU-Ultra -name "rules.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$RAW_RULES" ]; then
-            RULES_FILE=$(readlink -f "$RAW_RULES")
-            echo "[+] 找到 rules.c: $RULES_FILE，修正 5.4 SELinux 锁"
-            sed -i 's/mutex_lock(&selinux_state.ss_mutex);/write_lock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
-            sed -i 's/mutex_unlock(&selinux_state.ss_mutex);/write_unlock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
-            sed -i 's/selinux_state.ss_mutex/selinux_state.ss->policy_lock/g' "$RULES_FILE" || true
-            sed -i 's/selinux_state\.policy/selinux_state.ss->policy/g' "$RULES_FILE" || true
+              RULES_FILE=$(readlink -f "$RAW_RULES")
+              echo "[+] 找到 rules.c: $RULES_FILE，修正 5.4 SELinux 锁机制"
+              sed -i 's/mutex_lock(&selinux_state.ss_mutex);/write_lock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
+              sed -i 's/mutex_unlock(&selinux_state.ss_mutex);/write_unlock(\&selinux_state.ss->policy_lock);/g' "$RULES_FILE" || true
+              sed -i 's/selinux_state.ss_mutex/selinux_state.ss->policy_lock/g' "$RULES_FILE" || true
           fi
 
           echo "========================================"
@@ -108,35 +108,33 @@ jobs:
           echo "========================================"
           SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
           if [ -n "$SUSFS_C" ]; then
-            cp "$SUSFS_C" fs/
+              cp "$SUSFS_C" fs/
           else
-            echo "[-] 错误: 未在 susfs4ksu 中找到 susfs.c" && exit 1
+              echo "[-] 错误: 未在 susfs4ksu 中找到 susfs.c" && exit 1
           fi
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
           echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
-
           if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
-            echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
-            patch -p1 --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
+              echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
+              patch -p1 --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
           else
-            echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
+              echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
           fi
 
           # 修复 kernel/sys.c 的 Clang 声明报错
           if grep -q "override_custom_release" kernel/sys.c; then
-            sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c
+              sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c
           fi
 
           # 追加 Makefile 和 Kconfig
           if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
+              echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
-
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
-            echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
+              echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
 
           echo "========================================"
@@ -158,20 +156,19 @@ jobs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           "
-
           find arch/arm64/configs -type f -name "*defconfig*" | while read -r cfg; do
-            echo "$CONFIG_LIST" >> "$cfg"
+              echo "$CONFIG_LIST" >> "$cfg"
           done
 
           echo "========================================"
           echo "SukiSU Ultra + SUSFS 适配修改完成！"
           echo "========================================"
+
       - name: Build Integrated Kernel
         run: |
           set -euo pipefail
           CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
           export PATH="${CLANG_DIR}/bin:${PATH}"
-
           cd kernel_source
 
           export ARCH=arm64
@@ -185,20 +182,16 @@ jobs:
           echo "========================================"
           echo "1. 自动定位配置文件 (defconfig)"
           echo "========================================"
-
           DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
-
           if [ -z "${DEFCONFIG_TARGET}" ]; then
-            echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
-            exit 1
+              echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
+              exit 1
           fi
-
           echo "匹配配置文件: ${DEFCONFIG_TARGET}"
 
           echo "========================================"
           echo "2. 生成内核配置 (.config)"
           echo "========================================"
-
           make \
             ARCH=arm64 \
             LLVM=1 \
@@ -216,13 +209,11 @@ jobs:
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"
           echo "========================================"
-
           grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 在 .config 中未成功启用！"; exit 1; }
 
           echo "========================================"
           echo "4. 开始编译集成内核"
           echo "========================================"
-
           make \
             ARCH=arm64 \
             LLVM=1 \
@@ -247,17 +238,17 @@ jobs:
           echo "========================================"
           OUT_DIR="${GITHUB_WORKSPACE}/out"
           if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
-            cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
+              cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
           elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ]; then
-            cp "${OUT_DIR}/arch/arm64/boot/Image.gz" AnyKernel3/
-            if [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ]; then
-              cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
-            fi
+              cp "${OUT_DIR}/arch/arm64/boot/Image.gz" AnyKernel3/
+              if [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ]; then
+                  cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
+              fi
           elif [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
-            cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
+              cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
           else
-            echo "ERROR: 未找到支持的内核镜像文件！"
-            exit 1
+              echo "ERROR: 未找到支持的内核镜像文件！"
+              exit 1
           fi
 
           echo "========================================"

@@ -3,7 +3,7 @@
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  *
  */
-
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>

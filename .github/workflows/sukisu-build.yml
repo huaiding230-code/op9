@@ -71,11 +71,7 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh main
 
-          # 3.1 全局强制开启 CONFIG_RPS 并补齐 linux/pgtable.h
-          echo "[+] 强制解封并启用 CONFIG_RPS"
-          sed -i 's/config RPS/config RPS\n\tdefault y/g' net/core/Kconfig 2>/dev/null || true
-          sed -i '/config ARM64/a \tselect RPS' arch/arm64/Kconfig
-
+          # 3.1 补齐 linux/pgtable.h 兼容垫片
           if [ ! -f "include/linux/pgtable.h" ]; then
               echo "[+] 创建 linux/pgtable.h 兼容垫片"
               mkdir -p include/linux
@@ -236,13 +232,14 @@ jobs:
             O="${OUT_DIR}" \
             "${DEFCONFIG_TARGET}"
 
-          # 强制写入关键配置开关并刷新
+          # 1. 先用目标 defconfig 生成基础 .config，然后强行追加我们需要的开关
           echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
-          
+
+          # 2. 最后再运行 olddefconfig 刷新并补全依赖关系
           make \
             ARCH=arm64 \
             LLVM=1 \

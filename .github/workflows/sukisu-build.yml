@@ -27,7 +27,22 @@ jobs:
       - name: Integrate SukiSU Ultra + SUSFS
         run: |
           set -euo pipefail
+          
+          CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
+          export PATH="${CLANG_DIR}/bin:${PATH}"
+
           cd kernel_source
+
+          # 修复 DTS Makefile 中开头的 8 个空格误转问题，自动替换回标准的 TAB 键
+          find arch/arm64/boot/dts/ -name "Makefile" -exec sed -i 's/^        /\t/g' {} +
+
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+          OUT_DIR="${GITHUB_WORKSPACE}/out"
+          mkdir -p "${OUT_DIR}"
 
           echo "========================================"
           echo "1. 克隆 SukiSU Ultra 与 个人镜像 susfs4ksu"

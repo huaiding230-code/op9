@@ -103,13 +103,20 @@ jobs:
               sed -i '1i #include <linux/sched/task.h>\n#include <linux/task_work.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME 1\n#endif' "$ALLOWLIST_FILE"
           fi
 
-          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (5.4 无 selinux_policy/.policy 及 policy_mutex)
+          # 3.4 适配 5.4 内核 SELinux 结构体与锁 (5.4 无 selinux_policy/.policy、policy_mutex 及 stypes)
           echo "[+] 替换 SELinux 模块中的 5.7+ 结构体与字段名称为 5.4 兼容格式"
           if [ -d "drivers/kernelsu/selinux" ]; then
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/\bselinux_policy\b/selinux_ss/g' {} +
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/\.policy\b/.ss/g' {} +
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/\/* mutex_lock *\/;/g' {} +
               find drivers/kernelsu/selinux -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/\/* mutex_unlock *\/;/g' {} +
+
+              # 适配 sepolicy.c 在 5.4 内核中的 filename_trans 结构体
+              if [ -f "drivers/kernelsu/selinux/sepolicy.c" ]; then
+                  sed -i '1i #include <linux/version.h>\n#include "ss/policydb.h"' drivers/kernelsu/selinux/sepolicy.c || true
+                  sed -i 's/ebitmap_set_bit(&trans->stypes, \(.*\)- 1, 1)/(trans->otype = \1, 0)/g' drivers/kernelsu/selinux/sepolicy.c
+                  sed -i 's/trans->stypes/trans->otype/g' drivers/kernelsu/selinux/sepolicy.c
+              fi
           fi
 
           # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏

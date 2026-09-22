@@ -205,7 +205,6 @@ jobs:
           echo "6. 配置 defconfig 开关"
           echo "========================================"
           CONFIG_LIST="
-          CONFIG_RPS=y
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -260,7 +259,6 @@ jobs:
 
           echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_ENERGY_MODEL=y" >> "${OUT_DIR}/.config"

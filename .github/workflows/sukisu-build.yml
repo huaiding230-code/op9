@@ -211,7 +211,6 @@ jobs:
           export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-
           OUT_DIR="${GITHUB_WORKSPACE}/out"
           mkdir -p "${OUT_DIR}"
 
@@ -230,14 +229,12 @@ jobs:
           echo "========================================"
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
 
-          # 1. 先追加我们需要的配置
           echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
 
-          # 2. 再跑 olddefconfig
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
 
           echo "========================================"
@@ -248,16 +245,7 @@ jobs:
           echo "========================================"
           echo "4. 开始编译集成内核"
           echo "========================================"
-          make \
-            ARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            CC=clang \
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration"
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            O="${OUT_DIR}" \
-            -j$(nproc)
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
 
       - name: Package with AnyKernel3
         run: |
@@ -297,5 +285,5 @@ jobs:
       - name: Upload Integrated Kernel Zip Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: blu_spark-SukiSU-SUSFS-lemonadep-Zip
+          name: blu_spark_SukiSU_SUSFS_lemonadep
           path: blu_spark_SukiSU_SUSFS_lemonadep.zip

@@ -110,7 +110,7 @@ jobs:
               SEPOLICY_FILE="drivers/kernelsu/selinux/sepolicy.c"
               if [ -f "$SEPOLICY_FILE" ]; then
                   sed -i '1i #include "ss/policydb.h"' "$SEPOLICY_FILE"
-                  sed -i 's/ebitmap_set_bit(&trans->stypes.*/(void)0;/g' "$SEPOLICY_FILE"
+                  sed -i 's/ebitmap_set_bit(&trans->stypes.*/return false;/g' "$SEPOLICY_FILE"
                   sed -i 's/trans->stypes/trans->otype/g' "$SEPOLICY_FILE"
               fi
           fi
@@ -134,7 +134,7 @@ jobs:
           MSM_PERF="drivers/soc/qcom/msm_performance.c"
           if [ -f "$MSM_PERF" ]; then
               echo "[+] 修复 msm_performance.c 头文件缺失"
-              sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
+              sed -i '/#include <linux\/init.h>/a #include <linux\/cpufreq.h>' "$MSM_PERF" 2>/dev/null || sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
           fi
           
           echo "========================================"

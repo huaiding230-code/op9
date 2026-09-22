@@ -148,6 +148,13 @@ jobs:
           if [ -n "$QC_VAS" ] && [ -f "$QC_VAS" ]; then
             sed -i 's/\bNOHZ_KICK_MASK\b/0x3/g' "$QC_VAS"
           fi
+
+          # 3.10 补齐 5.4 内核缺失的 linux/minmax.h 垫片
+          if [ ! -f "include/linux/minmax.h" ]; then
+          echo "[+] 创建 linux/minmax.h 兼容垫片"
+          mkdir -p include/linux
+          echo "#include <linux/kernel.h>" > include/linux/minmax.h
+          fi
         
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"

@@ -60,9 +60,9 @@ jobs:
           git clone --depth=1 -b 5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
           git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
 
-          # === [新增] 自動修復 blu_spark 5.4 内核 fsnotify 8 參數不匹配問題 ===
-          echo "[+] 正在自動修復 pkg_observer.c API 簽名..."
-          find /tmp/SukiSU-Ultra -name "pkg_observer.c" -exec sed -i 's/struct fsnotify_mark \*mark, u32 mask, struct inode \*inode, struct inode \*dir, const struct qstr \*file_name, u32 cookie/struct fsnotify_group \*group, struct inode \*inode, u32 mask, const void \*data, int data_type, const struct qstr \*file_name, u32 cookie, struct fsnotify_iter_info \*iter_info/g' {} +
+          # === [纯 Shell] 使用 Perl 進行跨行多行正則修補 pkg_observer.c ===
+          echo "[+] 正在使用 Shell 修補 pkg_observer.c 跨行函數宣告..."
+          find /tmp/SukiSU-Ultra -name "pkg_observer.c" -exec perl -0777 -pi -e 's/static int ksu_handle_inode_event\s*\([^)]*\)/static int ksu_handle_inode_event(struct fsnotify_group *group, struct inode *inode, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info)/s' {} +
           
           # 1.2 从个人 GitHub 仓库拉取 5.4 补丁
           echo "[+] 正在从 huaiding230-code/susfs4ksu 拉取补丁..."

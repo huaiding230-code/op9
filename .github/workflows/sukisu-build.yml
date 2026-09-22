@@ -55,20 +55,10 @@ jobs:
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
 
-          # 1.1 克隆 SukiSU Ultra
-          # git clone --depth=1 -b kernel-5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
-          # git clone --depth=1 -b 5.4 https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra || \
+          # 1.1 强制只克隆你自己的 SukiSU-Ultra 仓库（内含已适配 5.4 的源码）
           git clone --depth=1 https://github.com/huaiding230-code/SukiSU-Ultra.git /tmp/SukiSU-Ultra
-          
-          # # === [纯 Shell] 修补 pkg_observer.c 适配 Linux 5.4 fsnotify ===
-          # echo "[+] 正在修补 pkg_observer.c 字段与函数签名..."
-          # find /tmp/SukiSU-Ultra -name "pkg_observer.c" -exec sed -i 's/\.handle_inode_event/.handle_event/g' {} +
-          # find /tmp/SukiSU-Ultra -name "pkg_observer.c" -exec perl -0777 -pi -e 's/static int ksu_handle_inode_event\s*\([\s\S]*?\)/static int ksu_handle_inode_event(struct fsnotify_group *group, struct inode *inode, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info)/g' {} +
-          
-          # 1.2 从个人 GitHub 仓库拉取 5.4 补丁
-          echo "[+] 正在从 huaiding230-code/susfs4ksu 拉取补丁..."
-          git clone --depth=1 -b kernel-5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
-          git clone --depth=1 -b 5.4 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu || \
+
+          # 1.2 强制只克隆你自己的 susfs4ksu 仓库
           git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
 
           echo "========================================"

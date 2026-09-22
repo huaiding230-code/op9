@@ -277,7 +277,11 @@ jobs:
           echo "========================================"
           echo "4. 开始编译集成内核"
           echo "========================================"
-          # 注意：这里的 KCFLAGS 必须同样带有 -Wno-int-conversion
+          # === [新增] 强制开启 KPM 与动态模块支持 ===
+          #echo "[+] 正在向 .config 写入 KPM 编译配置..."
+          #echo "CONFIG_MODULES=y" >> ${OUT_DIR}/.config
+          #echo "CONFIG_KSU_KPM=y" >> ${OUT_DIR}/.config
+          
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
       
       - name: Package with AnyKernel3

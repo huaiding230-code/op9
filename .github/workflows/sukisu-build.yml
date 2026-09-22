@@ -106,6 +106,8 @@ jobs:
 
           # 3.4 无死角全盘递归适配 drivers/kernelsu 目录下所有源码
           echo "[+] 全盘递归适配 SELinux 与 5.4 语法兼容性"
+          # 补上这行：将 5.8+ 的 linux/pgtable.h 替换为 5.4 的 asm/pgtable.h
+          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's#<linux/pgtable.h>#<asm/pgtable.h>#g' {} +
           find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
             f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
             if [ -f "$f" ]; then

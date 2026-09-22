@@ -130,6 +130,13 @@ jobs:
           # 3.7 递归清理源码树（含 techpack 等子驱动）Makefile 中的 -Werror
           find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
+          # 3.8 修复 msm_performance.c 缺失 cpufreq.h 头文件
+          MSM_PERF="drivers/soc/qcom/msm_performance.c"
+          if [ -f "$MSM_PERF" ]; then
+              echo "[+] 修复 msm_performance.c 头文件缺失"
+              sed -i '1i #include <linux/cpufreq.h>' "$MSM_PERF"
+          fi
+          
           echo "========================================"
           echo "4. 从 susfs4ksu 提取源码文件"
           echo "========================================"

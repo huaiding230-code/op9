@@ -209,9 +209,7 @@ jobs:
           echo "6. 配置 defconfig 开关"
           echo "========================================"
           CONFIG_LIST="
-          
           CONFIG_KSU=y
-          
           CONFIG_KSU_SUSFS=y
           CONFIG_RPS=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -265,23 +263,18 @@ jobs:
           # 2.1 生成基础 .config
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
 
-          # 2.2 强制将 RPS 与关键配置追加到最终生成的 .config 中
+          # 2.2 强制将 RPS 与关键配置直接追加到 OUT_DIR 的 .config 中
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_KEYS_COMPAT=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
           echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_ENERGY_MODEL=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_SCHED_ENERGY=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_BLK_INLINE_ENCRYPTION=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_BLK_INLINE_ENCRYPTION_FALLBACK=y" >> "${OUT_DIR}/.config"
 
-          # 2.3 执行 olddefconfig 确认配置并打印检查
+          # 2.3 刷新并确认配置
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
-
-          # 2.4 打印验证 RPS 状态
+      
+          # 打印验证 RPS 状态
           grep "CONFIG_RPS" "${OUT_DIR}/.config" || true
-          
+
           echo "========================================"
           echo "3. 校验最终 .config 中的 SUSFS 开关"
           echo "========================================"
@@ -290,8 +283,9 @@ jobs:
           echo "========================================"
           echo "4. 开始编译集成内核"
           echo "========================================"
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
-
+          # 注意：这里的 KCFLAGS 必须同样带有 -Wno-int-conversion
+          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
+      
       - name: Package with AnyKernel3
         run: |
           set -euo pipefail

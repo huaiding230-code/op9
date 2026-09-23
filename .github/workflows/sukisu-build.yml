@@ -118,12 +118,19 @@ jobs:
           make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
 
           echo "========================================"
-          echo "3. 注入高优先级 Config"
+          echo "3. 注入高优先级 Config 及其依赖项"
           echo "========================================"
           CONFIG_TOOL="scripts/config"
           if [ -f "${CONFIG_TOOL}" ]; then
             chmod +x "${CONFIG_TOOL}"
+            # 先点亮可能影响 RPS 的底层依赖
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NET
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_INET
+            
+            # 强制点亮 RPS 目标选项
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPS
+            
+            # 其他所有 KSU / SUSFS 选项
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_PERF_EVENTS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HW_PERF_EVENTS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KEYS
@@ -145,7 +152,10 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
           fi
 
+          # 再次执行 olddefconfig 固化配置，然后追加写入作为最后防线
           make "${MAKE_ARGS[@]}" olddefconfig
+          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
+          echo "CONFIG_NET_RX_BUSY_POLL=y" >> "${OUT_DIR}/.config"
 
           echo "========================================"
           echo "4. 核心配置依赖性强校验"

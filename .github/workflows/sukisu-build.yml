@@ -217,7 +217,7 @@ jobs:
           echo "========================================"
           echo "1. 下载 AnyKernel3 模版"
           echo "========================================"
-          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/README.md
 
           echo "========================================"

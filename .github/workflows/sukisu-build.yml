@@ -144,6 +144,9 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
+            # 禁用在 Linux 5.4 上不兼容的 SELinux Hide 功能
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_KSU_SELINUX_HIDE
+            echo "# CONFIG_KSU_SELINUX_HIDE is not set" >> "${OUT_DIR}/.config"
           fi
   
           # 注入底层通信父依赖 & 禁用引发 Link 错误的外设

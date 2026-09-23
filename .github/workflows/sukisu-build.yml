@@ -298,6 +298,10 @@ jobs:
           echo "4. 开始编译集成内核"
           echo "========================================"
 
+          if [ -d "drivers/kernelsu" ]; then
+              echo "[+] 正在强制修补 drivers/kernelsu 中的 TWA_RESUME..."
+              find drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec perl -pi -e 's/\bTWA_RESUME\b/true/g' {} +
+          fi
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
       
       - name: Package with AnyKernel3

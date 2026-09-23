@@ -166,6 +166,25 @@ jobs:
           grep -q "CONFIG_RPS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_RPS 未启用！"; exit 1; }
           grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 未启用！"; exit 1; }
 
+          - name: Force Inject Required Configs
+          run: |
+            # 强制写入关键依赖
+            echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
+            echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
+            echo "CONFIG_RPMSG=y" >> out/.config
+            echo "CONFIG_QCOM_SMEM=y" >> out/.config
+            echo "CONFIG_QRTR=y" >> out/.config
+            echo "CONFIG_QCOM_QMI_HELPERS=y" >> out/.config
+            echo "CONFIG_DMA_SHARED_BUFFER=y" >> out/.config
+            echo "CONFIG_OPLUS_PROJECT_INFO=y" >> out/.config
+        
+            # 禁用无用报错外设
+            sed -i 's/CONFIG_HID_QVR=y/# CONFIG_HID_QVR is not set/' out/.config
+            sed -i 's/CONFIG_MSM_RDBG=m/# CONFIG_MSM_RDBG is not set/' out/.config
+        
+            # 刷一遍 olddefconfig 自动补全其他关联符号
+            make O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+
           echo "========================================"
           echo "5. 执行内核编译"
           echo "========================================"

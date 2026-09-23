@@ -152,6 +152,11 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
           fi
 
+          # 补上报错缺失的底层依赖符号
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
+          fi
+
           # 再次执行 olddefconfig 固化配置，然后追加写入作为最后防线
           make "${MAKE_ARGS[@]}" olddefconfig
           echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"

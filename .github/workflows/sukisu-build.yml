@@ -6,7 +6,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
       - name: Maximize Build Space
         uses: easimon/maximize-build-space@master
@@ -33,187 +32,157 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "2. 清理并禁用无关的 lemonadev 设备树"
-          echo "========================================"
-          git checkout -- arch/arm64/boot/dts/ || true
-
-          # 给 lemonadev/Makefile 写入空目标，符合 Kbuild 规范
-          if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
-              echo "obj-y :=" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
-          fi
-
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-
-          OUT_DIR="${GITHUB_WORKSPACE}/out"
-          mkdir -p "${OUT_DIR}"
-
-          echo "========================================"
-          echo "1. 克隆 SukiSU Ultra 与 个人镜像 susfs4ksu"
+          echo "1. 克隆 SukiSU Ultra 与 susfs4ksu 仓库"
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
-
-          # 1.1 强制只克隆你自己的 SukiSU-Ultra 仓库（内含已适配 5.4 的源码）
           git clone --depth=1 https://github.com/huaiding230-code/SukiSU-Ultra.git /tmp/SukiSU-Ultra
-
-         
-          # 1.2 强制只克隆你自己的 susfs4ksu 仓库
           git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
 
-     
           echo "========================================"
-          echo "3. 植入 SukiSU Ultra 驱动与 5.4 兼容补丁"
+          echo "2. 清理并处理 dts 节点"
           echo "========================================"
-          bash /tmp/SukiSU-Ultra/kernel/setup.sh main
+          git checkout -- arch/arm64/boot/dts/ || true
+          if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
+            echo "obj-y :=" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
+          fi
 
-          # 将 pkg_observer.c 直接替换为干净的兼容桩，彻底解决签名冲突
-          cat << 'EOF' > drivers/kernelsu/manager/pkg_observer.c
-          // SPDX-License-Identifier: GPL-2.0
-          #include <linux/module.h>
-          int ksu_observer_init(void) { return 0; }
-          void ksu_observer_exit(void) {}
+          echo "========================================"
+          echo "3. 植入 SukiSU Ultra 驱动"
+          echo "========================================"
+          bash /tmp/SukiSU-Ultra/kernel/setup.sh
+
+          echo "========================================"
+          echo "4. 配置 Linux 5.4 全局 C 语法兼容头文件"
+          echo "========================================"
+          mkdir -p drivers/kernelsu
+          cat << 'EOF' > drivers/kernelsu/ksu_compat.h
+          #ifndef _KSU_COMPAT_H
+          #define _KSU_COMPAT_H
+          
+          #include <linux/types.h>
+          #include <linux/kernel.h>
+          #include <asm/pgtable.h>
+          #include <linux/sched/task.h>
+          #include <linux/task_work.h>
+
+          /* 5.4 内核 task_work_add 参数兼容定义 */
+          #ifndef TWA_RESUME
+          #define TWA_RESUME true
+          #endif
+
+          /* 5.4 SELinux 数据结构兼容定义 */
+          #ifndef selinux_policy
+          #define selinux_policy selinux_ss
+          #endif
+          
+          #endif /* _KSU_COMPAT_H */
           EOF
 
-          # # 3.0 强制修正 drivers/kernelsu 内部 pkg_observer.c 适配 Linux 5.4 fsnotify
-          # echo "[+] 正在强行将 pkg_observer.c 适配为 5.4 签名"
-          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/\.handle_inode_event/.handle_event/g' {} +
-          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/ksu_handle_inode_event/ksu_handle_event/g' {} +
-          # find drivers/kernelsu -name "pkg_observer.c" -exec sed -i 's/struct fsnotify_mark \*mark, u32 mask, struct inode \*inode, struct inode \*dir, const struct qstr \*file_name, u32 cookie/struct fsnotify_group *group, struct inode *inode, u32 mask, const void *data, int data_type, const struct qstr *file_name, u32 cookie, struct fsnotify_iter_info *iter_info/g' {} + 
-          
-          # 3.1 补齐 5.4 内核全局垫片文件 (include/linux/)
-          echo "[+] 创建全局 5.4 内核兼容垫片文件"
-          mkdir -p include/linux
-          # [ ! -f "include/linux/pgtable.h" ] && echo -e "#ifndef _LINUX_PGTABLE_H\n#define _LINUX_PGTABLE_H\n#include <asm/pgtable.h>\n#endif" > include/linux/pgtable.h
-          # [ ! -f "include/linux/minmax.h" ] && echo "#include <linux/kernel.h>" > include/linux/minmax.h
-
-          # 3.2 创建 KSU 驱动全局预编译头文件 ksu_compat.h
-          echo "[+] 创建 drivers/kernelsu 全局兼容头文件 ksu_compat.h"
-          mkdir -p drivers/kernelsu
-          echo '#ifndef _KSU_COMPAT_H' > drivers/kernelsu/ksu_compat.h
-          echo '#define _KSU_COMPAT_H' >> drivers/kernelsu/ksu_compat.h
-          echo '#include <linux/types.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '#include <linux/kernel.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '#include <asm/pgtable.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '#include <linux/sched/task.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '#include <linux/task_work.h>' >> drivers/kernelsu/ksu_compat.h
-          echo '#ifndef TWA_RESUME' >> drivers/kernelsu/ksu_compat.h
-          echo '#define TWA_RESUME 1' >> drivers/kernelsu/ksu_compat.h
-          echo '#endif' >> drivers/kernelsu/ksu_compat.h
-          echo '#endif' >> drivers/kernelsu/ksu_compat.h
-
-          # 3.3 在 KSU Makefile 顶层强行全局预载 (-include) ksu_compat.h
-          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/dev/null | head -n 1 || true)
+          # 在 KSU Makefile 顶层强制全局预载 ksu_compat.h
+          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/devnull | head -n 1 || true)
           if [ -n "$KSU_MAKEFILE" ] && [ -f "$KSU_MAKEFILE" ]; then
             echo "[+] 注入 ccflags-y 全局预加载选项到 $KSU_MAKEFILE"
             sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
           fi
 
-          # 3.4 无死角全盘递归适配 drivers/kernelsu 目录下所有源码
-          echo "[+] 全盘递归适配 SELinux 与 5.4 语法兼容性"
-          # 补上这行：将 5.8+ 的 linux/pgtable.h 替换为 5.4 的 asm/pgtable.h
+          # 修正头文件包含名称格式 (linux/pgtable.h -> asm/pgtable.h)
           find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's#<linux/pgtable.h>#<asm/pgtable.h>#g' {} +
-          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
-            f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
-            if [ -f "$f" ]; then
-              sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
-              sed -i 's/\.policy\b/.ss/g' "$f"
-              sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-              sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-              grep -q "ss/policydb.h" "$f" || sed -i '1i #include <linux/types.h>\n#include "ss/policydb.h"' "$f"
-              if echo "$f" | grep -q "sepolicy.c"; then
-                sed -i '/filename_trans/,$d' "$f"
-                echo -e '\nbool ksu_allow_filename_trans(void *db, void *a, void *b, void *c) {\n    return true;\n}' >> "$f"
-              fi
-            fi
-          done
 
-          # 3.4.5 修复 fair.c 缺失 sched_energy_present 变量的编译错误
-          echo "[+] 修补 fair.c 能量模型兼容性"
+          # 修复 fair.c 能量模型兼容性（如果源码树存在该问题）
           if [ -f "kernel/sched/fair.c" ]; then
-          sed -i -E 's/static_branch_unlikely\([[:space:]]*&sched_energy_present[[:space:]]*\)/sched_energy_enabled()/g' kernel/sched/fair.c
-          sed -i 's/&sched_energy_present/NULL/g' kernel/sched/fair.c
+            echo "[+] 修补 fair.c 能量模型兼容性"
+            sed -i -E 's/static_branch_unlikely\([[:space:]]*&sched_energy_present[[:space:]]*\)/sched_energy_enabled()/g' kernel/sched/fair.c
+            sed -i 's/&sched_energy_present/NULL/g' kernel/sched/fair.c
           fi
-            
-          # 3.5 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 宏
+
+          # 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明
           if [ -f "drivers/iommu/iommu-debug.c" ]; then
-              echo "[+] 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明"
-              sed -i '1i #ifndef CONFIG_IOMMU_IOVA_ALIGNMENT\n#define CONFIG_IOMMU_IOVA_ALIGNMENT 0\n#endif' drivers/iommu/iommu-debug.c
+            echo "[+] 修复 iommu-debug.c 缺失 CONFIG_IOMMU_IOVA_ALIGNMENT 声明"
+            sed -i '1i #ifndef CONFIG_IOMMU_IOVA_ALIGNMENT\n#define CONFIG_IOMMU_IOVA_ALIGNMENT 0\n#endif' drivers/iommu/iommu-debug.c
           fi
 
-          # 3.6 修复 qcom_scm.h 空桩函数缺少 return 语法
-          # if [ -f "include/linux/qcom_scm.h" ]; then
-          #     echo "[+] 修复 qcom_scm.h 非 void 函数缺失 return 问题"
-          #     sed -i 's/)\s*{}/) { return 0; }/g' include/linux/qcom_scm.h
-          # fi
-
-          # 3.7 递归清理源码树（含 techpack 等子驱动）Makefile 中的 -Werror
+          # 清理 Makefile 中的 -Werror
           find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
 
-          # # 3.8 修复 msm_performance.c 缺失 perf_event.h 头文件
-          # MSM_PERF="drivers/soc/qcom/msm_performance.c"
-          # if [ -f "$MSM_PERF" ]; then
-          # echo "[+] 修复 msm_performance.c 头文件缺失"
-          # sed -i '1i #include <linux/perf_event.h>' "$MSM_PERF"
-          # fi
-
-          # # 3.9 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 宏声明
-          # echo "[+] 修复 qc_vas.c 缺失 NOHZ_KICK_MASK 声明"
-          # QC_VAS=$(find . -name "qc_vas.c" 2>/dev/null | head -n 1)
-          # if [ -n "$QC_VAS" ] && [ -f "$QC_VAS" ]; then
-          #   sed -i 's/\bNOHZ_KICK_MASK\b/0x3/g' "$QC_VAS"
-          # fi
-
-          # 3.10 补齐 5.4 内核缺失的 linux/minmax.h 垫片
-          # if [ ! -f "include/linux/minmax.h" ]; then
-          # echo "[+] 创建 linux/minmax.h 兼容垫片"
-          # mkdir -p include/linux
-          # echo "#include <linux/kernel.h>" > include/linux/minmax.h
-          # fi
-        
           echo "========================================"
-          echo "4. 从 susfs4ksu 提取源码文件"
+          echo "5. 从 susfs4ksu 提取源码与 Patch 覆盖"
           echo "========================================"
           SUSFS_C=$(find /tmp/susfs4ksu -name "susfs.c" | head -n 1)
           if [ -n "$SUSFS_C" ]; then
-              cp "$SUSFS_C" fs/
+            cp "$SUSFS_C" fs/
           else
-              echo "[-] 错误: 未在 susfs4ksu 中找到 susfs.c" && exit 1
+            echo "[-] 错误: 未在 susfs4ksu 中找到 susfs.c" && exit 1
           fi
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
 
           echo "========================================"
-          echo "5. 应用 5.4 内核 SUSFS VFS 补丁"
+          echo "6. 应用 5.4 内核 SUSFS VFS 补丁"
           echo "========================================"
           if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
-              echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
-              patch -p1 --batch -N --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
+            echo "[+] 找到本地补丁: patch/50_add_susfs_in_kernel-5.4.patch"
+            patch -p1 --batch -N --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
           else
-              echo "[-] 致命错误: 未在 patch/ 目录下找到 50_add_susfs_in_kernel-5.4.patch 文件！" && exit 1
+            echo "[-] 致命错误: 未找到 50_add_susfs_in_kernel-5.4.patch！" && exit 1
           fi
 
-          # 修复 kernel/sys.c 的 Clang 警告报错
-          # if [ -f "kernel/sys.c" ]; then
-          #     sed -i '1i #pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-variable"' kernel/sys.c
-          #     sed -i 's/static void override_custom_release/static void __maybe_unused override_custom_release/' kernel/sys.c || true
-          # fi
-
-          # 追加 Makefile 和 Kconfig
           if ! grep -q "susfs.o" fs/Makefile; then
-              echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
+            echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
           fi
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
-              echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
+            echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
 
           echo "========================================"
-          echo "6. 配置 defconfig 开关"
+          echo "SukiSU Ultra + SUSFS 集成完成！"
           echo "========================================"
-          CONFIG_LIST="
+
+      - name: Build Integrated Kernel
+        run: |
+          set -euo pipefail
+          cd kernel_source
+
+          CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
+          export PATH="${CLANG_DIR}/bin:${PATH}"
+
+          OUT_DIR="${GITHUB_WORKSPACE}/out"
+          rm -rf "${OUT_DIR}"
+          mkdir -p "${OUT_DIR}"
+
+          echo "========================================"
+          echo "1. 自动定位配置文件 (defconfig)"
+          echo "========================================"
+          DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
+          if [ -z "${DEFCONFIG_TARGET}" ]; then
+            echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
+            exit 1
+          fi
+          echo "匹配配置文件: ${DEFCONFIG_TARGET}"
+
+          # 设置标准编译选项
+          MAKE_ARGS=(
+            ARCH=arm64
+            LLVM=1
+            LLVM_IAS=1
+            CC=clang
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+            O="${OUT_DIR}"
+          )
+
+          echo "========================================"
+          echo "2. 生成并注入内核配置 (.config)"
+          echo "========================================"
+          make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
+
+          # 统一注入需要的配置选项
+          cat << 'EOF' >> "${OUT_DIR}/.config"
+          CONFIG_PERF_EVENTS=y
+          CONFIG_HW_PERF_EVENTS=y
+          CONFIG_RPS=y
+          CONFIG_KEYS=y
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
-          CONFIG_RPS=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
@@ -226,84 +195,22 @@ jobs:
           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          "
-          find arch/arm64/configs -type f -name "*defconfig*" | while read -r cfg; do
-              echo "$CONFIG_LIST" >> "$cfg"
-          done
+          CONFIG_MEDIA_CONTROLLER=y
+          CONFIG_BLK_INLINE_ENCRYPTION=y
+          EOF
+
+          make "${MAKE_ARGS[@]}" olddefconfig
 
           echo "========================================"
-          echo "SukiSU Ultra + SUSFS 适配修改完成！"
+          echo "3. 校验关键配置项"
           echo "========================================"
-
-      - name: Build Integrated Kernel
-        run: |
-          set -euo pipefail
-          CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
-          export PATH="${CLANG_DIR}/bin:${PATH}"
-          cd kernel_source
-
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-          OUT_DIR="${GITHUB_WORKSPACE}/out"
-          
-          # === [修改 1] 清理旧输出目录，防止缓存干扰 ===
-          rm -rf "${OUT_DIR}"
-          mkdir -p "${OUT_DIR}"
+          grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 未成功启用！"; exit 1; }
 
           echo "========================================"
-          echo "1. 自动定位配置文件 (defconfig)"
+          echo "4. 开始编译内核"
           echo "========================================"
-          DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
-          if [ -z "${DEFCONFIG_TARGET}" ]; then
-              echo "ERROR: 未在 arch/arm64/configs/ 中找到适配的配置文件！"
-              exit 1
-          fi
-          echo "匹配配置文件: ${DEFCONFIG_TARGET}"
+          make "${MAKE_ARGS[@]}" -j$(nproc)
 
-          echo "========================================"
-          echo "2. 生成内核配置 (.config)"
-          echo "========================================"
-
-          # === [新增] 注入 Perf Events 支援，解決 struct perf_event 缺少 cpu 欄位問題 ===
-          echo "CONFIG_PERF_EVENTS=y" >> arch/arm64/configs/vendor/vendor_defconfig
-          echo "CONFIG_HW_PERF_EVENTS=y" >> arch/arm64/configs/vendor/vendor_defconfig
-          
-          # 2.1 生成基础 .config
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
-
-          # 2.2 强制追加关键配置
-          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_KEYS=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_KSU=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_KSU_SUSFS=y" >> "${OUT_DIR}/.config"
-          
-          # === [修改 2] 追加修复高通相机与加密模块所需的配置 ===
-          echo "CONFIG_MEDIA_CONTROLLER=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_BLK_INLINE_ENCRYPTION=y" >> "${OUT_DIR}/.config"
-
-          # 2.3 刷新并确认配置
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" olddefconfig
-          
-          # 打印验证 RPS 状态
-          grep "CONFIG_RPS" "${OUT_DIR}/.config" || true
-
-          echo "========================================"
-          echo "3. 校验最终 .config 中的 SUSFS 开关"
-          echo "========================================"
-          grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 在 .config 中未成功启用！"; exit 1; }
-
-          echo "========================================"
-          echo "4. 开始编译集成内核"
-          echo "========================================"
-
-          if [ -d "drivers/kernelsu" ]; then
-              echo "[+] 正在强制修补 drivers/kernelsu 中的 TWA_RESUME..."
-              find drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec perl -pi -e 's/\bTWA_RESUME\b/true/g' {} +
-          fi
-          make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" -j$(nproc)
-      
       - name: Package with AnyKernel3
         run: |
           set -euo pipefail
@@ -318,17 +225,17 @@ jobs:
           echo "========================================"
           OUT_DIR="${GITHUB_WORKSPACE}/out"
           if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
-              cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
+            cp "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
           elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ]; then
-              cp "${OUT_DIR}/arch/arm64/boot/Image.gz" AnyKernel3/
-              if [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ]; then
-                  cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
-              fi
+            cp "${OUT_DIR}/arch/arm64/boot/Image.gz" AnyKernel3/
+            if [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ]; then
+              cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
+            fi
           elif [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
-              cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
+            cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
           else
-              echo "ERROR: 未找到支持的内核镜像文件！"
-              exit 1
+            echo "ERROR: 未找到支持的内核镜像文件！"
+            exit 1
           fi
 
           echo "========================================"

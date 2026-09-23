@@ -155,6 +155,11 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QRTR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_QMI_HELPERS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DMA_SHARED_BUFFER
+            # 补全高通 SMEM、项目信息及它们的底层总线/基础架构依赖
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_ARCH_QCOM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
   
             # 禁用用不到且引发报错的模块
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_HID_QVR

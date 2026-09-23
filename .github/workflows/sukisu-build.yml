@@ -144,10 +144,23 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
-            # 禁用在 Linux 5.4 上不兼容的 SELinux Hide 功能
+  
+            # 补全 CPU 频率与高通/OPLUS 共享内存依赖
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_IDLE
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_COMMON
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QRTR
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_QMI_HELPERS
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DMA_SHARED_BUFFER
+  
+            # 禁用用不到且引发报错的模块
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_HID_QVR
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_MSM_RDBG
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_KSU_SELINUX_HIDE
-            echo "# CONFIG_KSU_SELINUX_HIDE is not set" >> "${OUT_DIR}/.config"
-          fi
+          fi      
   
           # 注入底层通信父依赖 & 禁用引发 Link 错误的外设
           echo "CONFIG_NO_HZ_IDLE=y" >> "${OUT_DIR}/.config"

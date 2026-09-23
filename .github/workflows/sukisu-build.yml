@@ -150,11 +150,9 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
-          fi
-
-          # 补上报错缺失的底层依赖符号
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
           fi
 
           # 再次执行 olddefconfig 固化配置，然后追加写入作为最后防线

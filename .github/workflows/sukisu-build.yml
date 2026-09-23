@@ -167,7 +167,7 @@ jobs:
           mkdir -p "${OUT_DIR}"
 
           echo "========================================"
-          echo "1. 自动定位配置文件 (defconfig)"
+          echo "1. 自动定位并修改配置文件 (defconfig)"
           echo "========================================"
           DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
           if [ -z "${DEFCONFIG_TARGET}" ]; then
@@ -176,28 +176,13 @@ jobs:
           fi
           echo "匹配配置文件: ${DEFCONFIG_TARGET}"
 
-          # 设置标准编译选项
-          MAKE_ARGS=(
-            ARCH=arm64
-            LLVM=1
-            LLVM_IAS=1
-            CC=clang
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
-            CROSS_COMPILE=aarch64-linux-gnu-
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-            O="${OUT_DIR}"
-          )
-
-          echo "========================================"
-          echo "2. 生成并注入内核配置 (.config)"
-          echo "========================================"
-          make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
-
-          # 统一注入需要的配置选项
-          cat << 'EOF' >> "${OUT_DIR}/.config"
+          # 直接注入配置到 defconfig 源码文件中（防止被 olddefconfig 自动过滤）
+          DEFCONFIG_FILE="arch/arm64/configs/${DEFCONFIG_TARGET}"
+          sed -i '/CONFIG_RPS/d' "${DEFCONFIG_FILE}"
+          cat << 'EOF' >> "${DEFCONFIG_FILE}"
+          CONFIG_RPS=y
           CONFIG_PERF_EVENTS=y
           CONFIG_HW_PERF_EVENTS=y
-          CONFIG_RPS=y
           CONFIG_KEYS=y
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
@@ -217,11 +202,28 @@ jobs:
           CONFIG_BLK_INLINE_ENCRYPTION=y
           EOF
 
+          # 设置标准编译选项
+          MAKE_ARGS=(
+            ARCH=arm64
+            LLVM=1
+            LLVM_IAS=1
+            CC=clang
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+            O="${OUT_DIR}"
+          )
+
+          echo "========================================"
+          echo "2. 生成内核配置 (.config)"
+          echo "========================================"
+          make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
           make "${MAKE_ARGS[@]}" olddefconfig
 
           echo "========================================"
           echo "3. 校验关键配置项"
           echo "========================================"
+          grep -q "CONFIG_RPS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_RPS 未成功启用！"; exit 1; }
           grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 未成功启用！"; exit 1; }
 
           echo "========================================"

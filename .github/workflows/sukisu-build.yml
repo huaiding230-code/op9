@@ -23,7 +23,7 @@ jobs:
       - name: Setup Proton-Clang Toolchain
         run: |
           mkdir -p toolchain
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/proton-clang
+          git clone --depth=1 https://github.com/huaiding230-code/proton-clang.git toolchain/proton-clang
           echo "${GITHUB_WORKSPACE}/toolchain/proton-clang/bin" >> $GITHUB_PATH
 
       - name: Integrate SukiSU Ultra + SUSFS
@@ -32,11 +32,11 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "1. 克隆 SukiSU Ultra 与 susfs4ksu 源码"
+          echo "1. 克隆你个人仓库的 SukiSU Ultra 与 susfs4ksu"
           echo "========================================"
           rm -rf /tmp/SukiSU-Ultra /tmp/susfs4ksu
           git clone --depth=1 https://github.com/huaiding230-code/SukiSU-Ultra.git /tmp/SukiSU-Ultra
-          git clone --depth=1 https://github.com/gitlabadmin/susfs4ksu.git /tmp/susfs4ksu
+          git clone --depth=1 https://github.com/huaiding230-code/susfs4ksu.git /tmp/susfs4ksu
 
           echo "========================================"
           echo "2. 清理 dts 设备树冲突节点"
@@ -47,7 +47,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 执行 SukiSU 基础初始化脚本"
+          echo "3. 执行你专门修改过的 setup.sh"
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh
 
@@ -81,7 +81,7 @@ jobs:
           cd kernel_source
 
           echo "========================================"
-          echo "1. 植入 5.4 全局 C 语言预定义头文件 (ksu_compat.h)"
+          echo "1. 植入 5.4 全局 C 语言预定义头文件"
           echo "========================================"
           mkdir -p drivers/kernelsu
           cat << 'EOF' > drivers/kernelsu/ksu_compat.h
@@ -95,7 +95,6 @@ jobs:
           #include <linux/sched/task.h>
           #include <linux/task_work.h>
           
-          /* 5.4 task_work_add 参数兼容 */
           #ifndef TWA_RESUME
           #define TWA_RESUME true
           #endif
@@ -103,8 +102,7 @@ jobs:
           #endif /* _KSU_COMPAT_H */
           EOF
 
-          # 强制在 SukiSU 顶级 Makefile 预加载兼容头文件
-          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/devnull | head -n 1 || true)
+          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/dev/null | head -n 1 || true)
           if [ -n "$KSU_MAKEFILE" ] && [ -f "$KSU_MAKEFILE" ]; then
             sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
           fi
@@ -112,7 +110,7 @@ jobs:
           echo "========================================"
           echo "2. 重构 pkg_observer.c (替换为 5.4 干净存根)"
           echo "========================================"
-          PKG_OBS=$(find -L drivers/kernelsu -name "pkg_observer.c" 2>/devnull | head -n 1 || true)
+          PKG_OBS=$(find -L drivers/kernelsu -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
           [ -z "$PKG_OBS" ] && [ -f "KernelSU/kernel/manager/pkg_observer.c" ] && PKG_OBS="KernelSU/kernel/manager/pkg_observer.c"
           if [ -n "$PKG_OBS" ] && [ -f "$PKG_OBS" ]; then
             cat << 'EOF' > "$PKG_OBS"
@@ -124,9 +122,9 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 重构 sepolicy.c (彻底消除 filename_trans 5.4 不兼容报错)"
+          echo "3. 重构 sepolicy.c (安全擦除 5.4 报错片段)"
           echo "========================================"
-          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/devnull | head -n 1 || true)
+          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/dev/null | head -n 1 || true)
           [ -z "$SEPOLICY_C" ] && [ -f "KernelSU/kernel/selinux/sepolicy.c" ] && SEPOLICY_C="KernelSU/kernel/selinux/sepolicy.c"
           if [ -n "$SEPOLICY_C" ] && [ -f "$SEPOLICY_C" ]; then
             awk '
@@ -149,8 +147,8 @@ jobs:
           echo "========================================"
           echo "4. 全局修正 SELinux 成员名与头文件引用"
           echo "========================================"
-          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/devnull | while read -r raw_f; do
-            f=$(readlink -f "$raw_f" 2>/devnull || echo "$raw_f")
+          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
+            f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
             if [ -f "$f" ]; then
               sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
               sed -i 's/selinux_state\.policy\b/selinux_state.ss/g' "$f"
@@ -188,11 +186,10 @@ jobs:
           mkdir -p "${OUT_DIR}"
 
           echo "========================================"
-          echo "1. 解封 Kconfig 隐式配置限制"
+          echo "1. 精准解锁 Kconfig 隐式配置限制 (防 multiple types)"
           echo "========================================"
-          # 核心重点：解锁 RPS 隐藏配置，确保 olddefconfig 不会裁减掉 CONFIG_RPS
           if [ -f "net/core/Kconfig" ]; then
-            sed -i 's/config RPS/config RPS\n\tbool "Receive Packet Steering"/g' net/core/Kconfig
+            sed -i 's/^config RPS$/config RPS\n\tprompt "Receive Packet Steering"/g' net/core/Kconfig
           fi
 
           echo "========================================"
@@ -205,7 +202,6 @@ jobs:
           fi
           echo "匹配配置文件: ${DEFCONFIG_TARGET}"
 
-          # 设置标准编译参数
           MAKE_ARGS=(
             ARCH=arm64
             LLVM=1
@@ -217,11 +213,10 @@ jobs:
             O="${OUT_DIR}"
           )
 
-          # 先生成基础 .config
           make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
 
           echo "========================================"
-          echo "3. 使用内核脚本系统注入高优先级 Config"
+          echo "3. 注入高优先级 Config"
           echo "========================================"
           CONFIG_TOOL="scripts/config"
           if [ -f "${CONFIG_TOOL}" ]; then
@@ -246,30 +241,6 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
-          else
-            # 备用追加方案
-            cat << 'EOF' >> "${OUT_DIR}/.config"
-          CONFIG_RPS=y
-          CONFIG_PERF_EVENTS=y
-          CONFIG_HW_PERF_EVENTS=y
-          CONFIG_KEYS=y
-          CONFIG_KSU=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_MEDIA_CONTROLLER=y
-          CONFIG_BLK_INLINE_ENCRYPTION=y
-          EOF
           fi
 
           make "${MAKE_ARGS[@]}" olddefconfig
@@ -289,9 +260,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "========================================"
-          echo "1. 下载 AnyKernel3 模版"
+          echo "1. 下载你个人仓库的 AnyKernel3 模版"
           echo "========================================"
-          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/README.md
 
           echo "========================================"

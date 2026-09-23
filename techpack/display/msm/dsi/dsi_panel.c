@@ -11,9 +11,6 @@
 #include <linux/pwm.h>
 #include <video/mipi_display.h>
 
-struct raw_notifier_head;
-extern struct raw_notifier_head *tp_gesture_enable_notifier;
-
 #include "dsi_panel.h"
 #include "dsi_ctrl_hw.h"
 #include "dsi_parser.h"
@@ -21,6 +18,7 @@ extern struct raw_notifier_head *tp_gesture_enable_notifier;
 #include "sde_dsc_helper.h"
 #include "sde_vdc_helper.h"
 
+extern int (*tp_gesture_enable_notifier)(unsigned int tp_index);
 
 #ifdef OPLUS_BUG_STABILITY
 #include <soc/oplus/boot_mode.h>

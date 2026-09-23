@@ -82,15 +82,10 @@ jobs:
           #include <asm/pgtable.h>
           #include <linux/sched/task.h>
           #include <linux/task_work.h>
-
+          
           /* 5.4 内核 task_work_add 参数兼容定义 */
           #ifndef TWA_RESUME
           #define TWA_RESUME true
-          #endif
-
-          /* 5.4 SELinux 数据结构兼容定义 */
-          #ifndef selinux_policy
-          #define selinux_policy selinux_ss
           #endif
           
           #endif /* _KSU_COMPAT_H */
@@ -103,9 +98,21 @@ jobs:
             sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
           fi
 
+          # 适配 5.4 内核 SELinux 结构体成员名 (.policy -> .ss) 与锁机制
+          echo "[+] 修补 SELinux 与 5.4 结构体成员兼容性"
+          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/devnull | while read -r raw_f; do
+            f=$(readlink -f "$raw_f" 2>/devnull || echo "$raw_f")
+            if [ -f "$f" ]; then
+              sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
+              sed -i 's/selinux_state\.policy\b/selinux_state.ss/g' "$f"
+              sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
+              sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
+            fi
+          done
+
           # 修正头文件包含名称格式 (linux/pgtable.h -> asm/pgtable.h)
           find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's#<linux/pgtable.h>#<asm/pgtable.h>#g' {} +
-
+          
           # 修复 fair.c 能量模型兼容性（如果源码树存在该问题）
           if [ -f "kernel/sched/fair.c" ]; then
             echo "[+] 修补 fair.c 能量模型兼容性"

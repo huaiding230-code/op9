@@ -47,7 +47,7 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 执行你专门修改过的 setup.sh"
+          echo "3. 执行你魔改过的 setup.sh (全权交由你的库处理)"
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh
 
@@ -73,121 +73,6 @@ jobs:
           fi
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
             echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
-          fi
-
-      - name: Apply Linux 5.4 Global Compatibility Engine
-        run: |
-          set -euo pipefail
-          cd kernel_source
-
-          echo "========================================"
-          echo "1. 植入 5.4 全局 C 语言预定义头文件"
-          echo "========================================"
-          mkdir -p drivers/kernelsu
-          cat << 'EOF' > drivers/kernelsu/ksu_compat.h
-          #ifndef _KSU_COMPAT_H
-          #define _KSU_COMPAT_H
-          
-          #include <linux/version.h>
-          #include <linux/types.h>
-          #include <linux/kernel.h>
-          #include <asm/pgtable.h>
-          #include <linux/sched/task.h>
-          #include <linux/task_work.h>
-          
-          #ifndef TWA_RESUME
-          #define TWA_RESUME true
-          #endif
-          
-          #endif /* _KSU_COMPAT_H */
-          EOF
-
-          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/dev/null | head -n 1 || true)
-          if [ -n "$KSU_MAKEFILE" ] && [ -f "$KSU_MAKEFILE" ]; then
-            sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
-          fi
-
-          echo "========================================"
-          echo "2. 重构 pkg_observer.c (替换为 5.4 干净存根)"
-          echo "========================================"
-          PKG_OBS=$(find -L drivers/kernelsu -name "pkg_observer.c" 2>/dev/null | head -n 1 || true)
-          [ -z "$PKG_OBS" ] && [ -f "KernelSU/kernel/manager/pkg_observer.c" ] && PKG_OBS="KernelSU/kernel/manager/pkg_observer.c"
-          if [ -n "$PKG_OBS" ] && [ -f "$PKG_OBS" ]; then
-            cat << 'EOF' > "$PKG_OBS"
-          // SPDX-License-Identifier: GPL-2.0
-          #include <linux/module.h>
-          int ksu_observer_init(void) { return 0; }
-          void ksu_observer_exit(void) {}
-          EOF
-          fi
-
-          echo "========================================"
-          echo "3. 重构 sepolicy.c (精确花括号计数，完全屏蔽 5.4 报错片段)"
-          echo "========================================"
-          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/dev/null | head -n 1 || true)
-          [ -z "$SEPOLICY_C" ] && [ -f "KernelSU/kernel/selinux/sepolicy.c" ] && SEPOLICY_C="KernelSU/kernel/selinux/sepolicy.c"
-          if [ -n "$SEPOLICY_C" ] && [ -f "$SEPOLICY_C" ]; then
-            awk '
-            BEGIN { in_func = 0; b_level = 0; found = 0 }
-            /ksu_add_filename_trans/ && !/;/ && !in_func {
-                in_func = 1
-                print "#if 0"
-                print $0
-                for(i=1; i<=length($0); i++) {
-                    c = substr($0, i, 1)
-                    if(c == "{") { b_level++; found = 1 }
-                    if(c == "}") { b_level-- }
-                }
-                if(found && b_level == 0) {
-                    in_func = 0; found = 0
-                    print "#endif\nint ksu_add_filename_trans(void* a, void* b, void* c, void* d, void* e) { return 0; }"
-                }
-                next
-            }
-            in_func {
-                print $0
-                for(i=1; i<=length($0); i++) {
-                    c = substr($0, i, 1)
-                    if(c == "{") { b_level++; found = 1 }
-                    if(c == "}") { b_level-- }
-                }
-                if(found && b_level == 0) {
-                    in_func = 0; found = 0
-                    print "#endif\nint ksu_add_filename_trans(void* a, void* b, void* c, void* d, void* e) { return 0; }"
-                }
-                next
-            }
-            { print $0 }
-            ' "$SEPOLICY_C" > "${SEPOLICY_C}.tmp" && mv "${SEPOLICY_C}.tmp" "$SEPOLICY_C"
-          fi
-
-          echo "========================================"
-          echo "4. 全局修正 SELinux 成员名与头文件引用"
-          echo "========================================"
-          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
-            f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
-            if [ -f "$f" ]; then
-              sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
-              sed -i 's/selinux_state\.policy\b/selinux_state.ss/g' "$f"
-              sed -i 's/mutex_lock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-              sed -i 's/mutex_unlock(&selinux_state\.policy_mutex);/(void)0;/g' "$f"
-            fi
-          done
-
-          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's#<linux/pgtable.h>#<asm/pgtable.h>#g' {} +
-
-          echo "========================================"
-          echo "5. 全局清理 Makefile 中的 -Werror 与源码缺陷"
-          echo "========================================"
-          find . -type f \( -name "Makefile*" -o -name "*.mk" \) -exec sed -i 's/\b-Werror\b/ /g' {} + || true
-
-          if [ -f "kernel/sched/fair.c" ]; then
-            sed -i -E 's/static_branch_unlikely\([[:space:]]*&sched_energy_present[[:space:]]*\)/sched_energy_enabled()/g' kernel/sched/fair.c
-            sed -i 's/&sched_energy_present/NULL/g' kernel/sched/fair.c
-          fi
-
-          if [ -f "drivers/iommu/iommu-debug.c" ]; then
-            sed -i '1i #ifndef CONFIG_IOMMU_IOVA_ALIGNMENT\n#define CONFIG_IOMMU_IOVA_ALIGNMENT 0\n#endif' drivers/iommu/iommu-debug.c
           fi
 
       - name: Build Integrated Kernel

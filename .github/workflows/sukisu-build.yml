@@ -75,121 +75,103 @@ jobs:
             echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
 
-      - name: Build Integrated Kernel
-        run: |
-          set -euo pipefail
-          cd kernel_source
-
-          CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
-          export PATH="${CLANG_DIR}/bin:${PATH}"
-
-          OUT_DIR="${GITHUB_WORKSPACE}/out"
-          rm -rf "${OUT_DIR}"
-          mkdir -p "${OUT_DIR}"
-
-          echo "========================================"
-          echo "1. 精准解锁 Kconfig 隐式配置限制 (防 multiple types)"
-          echo "========================================"
-          if [ -f "net/core/Kconfig" ]; then
-            sed -i 's/^config RPS$/config RPS\n\tprompt "Receive Packet Steering"/g' net/core/Kconfig
-          fi
-
-          echo "========================================"
-          echo "2. 定位并配置 Target Defconfig"
-          echo "========================================"
-          DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
-          if [ -z "${DEFCONFIG_TARGET}" ]; then
-            echo "ERROR: 未在 arch/arm64/configs/ 中找到配置文件！"
-            exit 1
-          fi
-          echo "匹配配置文件: ${DEFCONFIG_TARGET}"
-
-          MAKE_ARGS=(
-            ARCH=arm64
-            LLVM=1
-            LLVM_IAS=1
-            CC=clang
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
-            CROSS_COMPILE=aarch64-linux-gnu-
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-            O="${OUT_DIR}"
-          )
-
-          make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
-
-          echo "========================================"
-          echo "3. 注入高优先级 Config 及其依赖项"
-          echo "========================================"
-          CONFIG_TOOL="scripts/config"
-          if [ -f "${CONFIG_TOOL}" ]; then
-            chmod +x "${CONFIG_TOOL}"
-            # 先点亮可能影响 RPS 的底层依赖
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NET
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_INET
-            
-            # 强制点亮 RPS 目标选项
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPS
-            
-            # 其他所有 KSU / SUSFS 选项
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_PERF_EVENTS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HW_PERF_EVENTS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KEYS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_PATH
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_MOUNT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_KSTAT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_ENABLE_LOG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
-          fi
-
-          # 再次执行 olddefconfig 固化配置，然后追加写入作为最后防线
-          make "${MAKE_ARGS[@]}" olddefconfig
-          echo "CONFIG_RPS=y" >> "${OUT_DIR}/.config"
-          echo "CONFIG_NET_RX_BUSY_POLL=y" >> "${OUT_DIR}/.config"
-
-          echo "========================================"
-          echo "4. 核心配置依赖性强校验"
-          echo "========================================"
-          grep -q "CONFIG_RPS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_RPS 未启用！"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 未启用！"; exit 1; }
-
-          - name: Force Inject Required Configs
+          - name: Build Integrated Kernel
           run: |
-            # 强制写入关键依赖
-            echo "CONFIG_NO_HZ_IDLE=y" >> out/.config
-            echo "CONFIG_NO_HZ_COMMON=y" >> out/.config
-            echo "CONFIG_RPMSG=y" >> out/.config
-            echo "CONFIG_QCOM_SMEM=y" >> out/.config
-            echo "CONFIG_QRTR=y" >> out/.config
-            echo "CONFIG_QCOM_QMI_HELPERS=y" >> out/.config
-            echo "CONFIG_DMA_SHARED_BUFFER=y" >> out/.config
-            echo "CONFIG_OPLUS_PROJECT_INFO=y" >> out/.config
+            set -euo pipefail
+            cd kernel_source
+            CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
+            export PATH="${CLANG_DIR}/bin:${PATH}"
+            OUT_DIR="${GITHUB_WORKSPACE}/out"
+            rm -rf "${OUT_DIR}"
+            mkdir -p "${OUT_DIR}"
+    
+            echo "========================================"
+            echo "1. 精准解锁 Kconfig 隐式配置限制 (防 multiple types)"
+            echo "========================================"
+            if [ -f "net/core/Kconfig" ]; then
+              sed -i 's/^config RPS$/config RPS\n\tprompt "Receive Packet Steering"/g' net/core/Kconfig
+            fi
+    
+            echo "========================================"
+            echo "2. 定位并配置 Target Defconfig"
+            echo "========================================"
+            DEFCONFIG_TARGET=$(find arch/arm64/configs/ -type f \( -name "*lemonadep*" -o -name "*lahaina*" -o -name "*blu_spark*" \) | head -n 1 | sed 's#arch/arm64/configs/##')
+            if [ -z "${DEFCONFIG_TARGET}" ]; then
+              echo "ERROR: 未在 arch/arm64/configs/ 中找到配置文件！"
+              exit 1
+            fi
+            echo "匹配配置文件: ${DEFCONFIG_TARGET}"
+    
+            MAKE_ARGS=(
+              ARCH=arm64
+              LLVM=1
+              LLVM_IAS=1
+              CC=clang
+              KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
+              CROSS_COMPILE=aarch64-linux-gnu-
+              CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+              O="${OUT_DIR}"
+            )
+    
+            make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
+    
+            echo "========================================"
+            echo "3. 注入高优先级 Config 及其依赖项"
+            echo "========================================"
+            CONFIG_TOOL="scripts/config"
+            if [ -f "${CONFIG_TOOL}" ]; then
+              chmod +x "${CONFIG_TOOL}"
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NET
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_INET
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_PERF_EVENTS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HW_PERF_EVENTS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KEYS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_PATH
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_MOUNT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_KSTAT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_ENABLE_LOG
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
+              "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
+            fi
+    
+            # 注入底层通信父依赖 & 禁用引发 Link 错误的外设
+            echo "CONFIG_NO_HZ_IDLE=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_NO_HZ_COMMON=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_RPMSG=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_QCOM_SMEM=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_QRTR=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_QCOM_QMI_HELPERS=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_DMA_SHARED_BUFFER=y" >> "${OUT_DIR}/.config"
+            echo "CONFIG_OPLUS_PROJECT_INFO=y" >> "${OUT_DIR}/.config"
+            sed -i 's/CONFIG_HID_QVR=y/# CONFIG_HID_QVR is not set/' "${OUT_DIR}/.config"
+            sed -i 's/CONFIG_MSM_RDBG=m/# CONFIG_MSM_RDBG is not set/' "${OUT_DIR}/.config"
+    
+            # 刷新 olddefconfig
+            make "${MAKE_ARGS[@]}" olddefconfig
+    
+            echo "========================================"
+            echo "4. 核心配置依赖性强校验"
+            echo "========================================"
+            grep -q "CONFIG_RPS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_RPS 未启用！"; exit 1; }
+            grep -q "CONFIG_KSU_SUSFS=y" "${OUT_DIR}/.config" || { echo "ERROR: CONFIG_KSU_SUSFS 未启用！"; exit 1; }
+    
+            echo "========================================"
+            echo "5. 执行内核编译"
+            echo "========================================"
+            make "${MAKE_ARGS[@]}" -j$(nproc)
         
-            # 禁用无用报错外设
-            sed -i 's/CONFIG_HID_QVR=y/# CONFIG_HID_QVR is not set/' out/.config
-            sed -i 's/CONFIG_MSM_RDBG=m/# CONFIG_MSM_RDBG is not set/' out/.config
-        
-            # 刷一遍 olddefconfig 自动补全其他关联符号
-            make O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-
-          echo "========================================"
-          echo "5. 执行内核编译"
-          echo "========================================"
-          make "${MAKE_ARGS[@]}" -j$(nproc)
-
       - name: Package with AnyKernel3
         run: |
           set -euo pipefail

@@ -184,6 +184,7 @@ jobs:
           "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
           "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
           "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
+          "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
     
           echo "========================================"
           echo "4. 核心配置依赖性强校验"

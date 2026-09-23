@@ -92,7 +92,7 @@ jobs:
           EOF
 
           # 在 KSU Makefile 顶层强制全局预载 ksu_compat.h
-          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/devnull | head -n 1 || true)
+          KSU_MAKEFILE=$(find -L drivers/kernelsu -name "Makefile" 2>/dev/null | head -n 1 || true)
           if [ -n "$KSU_MAKEFILE" ] && [ -f "$KSU_MAKEFILE" ]; then
             echo "[+] 注入 ccflags-y 全局预加载选项到 $KSU_MAKEFILE"
             sed -i '1i ccflags-y += -include $(srctree)/drivers/kernelsu/ksu_compat.h' "$KSU_MAKEFILE"
@@ -100,8 +100,8 @@ jobs:
 
           # 适配 5.4 内核 SELinux 结构体成员名 (.policy -> .ss) 与锁机制
           echo "[+] 修补 SELinux 与 5.4 结构体成员兼容性"
-          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/devnull | while read -r raw_f; do
-            f=$(readlink -f "$raw_f" 2>/devnull || echo "$raw_f")
+          find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) 2>/dev/null | while read -r raw_f; do
+            f=$(readlink -f "$raw_f" 2>/dev/null || echo "$raw_f")
             if [ -f "$f" ]; then
               sed -i 's/\bselinux_policy\b/selinux_ss/g' "$f"
               sed -i 's/selinux_state\.policy\b/selinux_state.ss/g' "$f"
@@ -111,7 +111,7 @@ jobs:
           done
 
           # 纯 Shell (AWK) 精准替换 5.4 不支持的 ksu_add_filename_trans 函数为 0 存根
-          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/devnull | head -n 1 || true)
+          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/dev/null | head -n 1 || true)
           if [ -n "$SEPOLICY_C" ] && [ -f "$SEPOLICY_C" ]; then
             echo "[+] 正在使用 AWK 替换 $SEPOLICY_C 中的 ksu_add_filename_trans 函数"
             awk '

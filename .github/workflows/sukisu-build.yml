@@ -110,6 +110,15 @@ jobs:
             fi
           done
 
+          # 屏蔽 5.4 内核不支持的 SELinux filename_trans 动态规则 (仅 5.7+ / 5.10+ GKI 支持)
+          SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/dev/null | head -n 1 || true)
+          if [ -n "$SEPOLICY_C" ] && [ -f "$SEPOLICY_C" ]; then
+            echo "[+] 修补 $SEPOLICY_C 中 5.4 不兼容的 filename_trans 代码段"
+            sed -i '/ksu_add_filename_trans/i #if 0' "$SEPOLICY_C"
+            echo "#endif" >> "$SEPOLICY_C"
+            echo "int ksu_add_filename_trans(void *a, void *b, void *c, void *d, void *e) { return 0; }" >> "$SEPOLICY_C"
+          fi
+
           # 修正头文件包含名称格式 (linux/pgtable.h -> asm/pgtable.h)
           find -L drivers/kernelsu -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's#<linux/pgtable.h>#<asm/pgtable.h>#g' {} +
           

@@ -122,25 +122,42 @@ jobs:
           fi
 
           echo "========================================"
-          echo "3. 重构 sepolicy.c (安全擦除 5.4 报错片段)"
+          echo "3. 重构 sepolicy.c (精确花括号计数，完全屏蔽 5.4 报错片段)"
           echo "========================================"
           SEPOLICY_C=$(find -L drivers/kernelsu -name "sepolicy.c" 2>/dev/null | head -n 1 || true)
           [ -z "$SEPOLICY_C" ] && [ -f "KernelSU/kernel/selinux/sepolicy.c" ] && SEPOLICY_C="KernelSU/kernel/selinux/sepolicy.c"
           if [ -n "$SEPOLICY_C" ] && [ -f "$SEPOLICY_C" ]; then
             awk '
-              /ksu_add_filename_trans/ && !/;/ {
-                if (!done) {
-                  print "int ksu_add_filename_trans(void *a, void *b, void *c, void *d, void *e) { return 0; }"
-                  skip = 1
-                  done = 1
-                  next
+            BEGIN { in_func = 0; b_level = 0; found = 0 }
+            /ksu_add_filename_trans/ && !/;/ && !in_func {
+                in_func = 1
+                print "#if 0"
+                print $0
+                for(i=1; i<=length($0); i++) {
+                    c = substr($0, i, 1)
+                    if(c == "{") { b_level++; found = 1 }
+                    if(c == "}") { b_level-- }
                 }
-              }
-              skip && /^}/ {
-                skip = 0
+                if(found && b_level == 0) {
+                    in_func = 0; found = 0
+                    print "#endif\nint ksu_add_filename_trans(void* a, void* b, void* c, void* d, void* e) { return 0; }"
+                }
                 next
-              }
-              !skip { print }
+            }
+            in_func {
+                print $0
+                for(i=1; i<=length($0); i++) {
+                    c = substr($0, i, 1)
+                    if(c == "{") { b_level++; found = 1 }
+                    if(c == "}") { b_level-- }
+                }
+                if(found && b_level == 0) {
+                    in_func = 0; found = 0
+                    print "#endif\nint ksu_add_filename_trans(void* a, void* b, void* c, void* d, void* e) { return 0; }"
+                }
+                next
+            }
+            { print $0 }
             ' "$SEPOLICY_C" > "${SEPOLICY_C}.tmp" && mv "${SEPOLICY_C}.tmp" "$SEPOLICY_C"
           fi
 

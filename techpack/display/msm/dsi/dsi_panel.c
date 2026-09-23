@@ -18,6 +18,9 @@
 #include "sde_dsc_helper.h"
 #include "sde_vdc_helper.h"
 
+struct raw_notifier_head;
+extern struct raw_notifier_head *tp_gesture_enable_notifier;
+
 #ifdef OPLUS_BUG_STABILITY
 #include <soc/oplus/boot_mode.h>
 #include "oplus_display_private_api.h"

@@ -265,6 +265,11 @@ jobs:
           echo "========================================"
           echo "2. 生成内核配置 (.config)"
           echo "========================================"
+
+          # === [新增] 注入 Perf Events 支援，解決 struct perf_event 缺少 cpu 欄位問題 ===
+          echo "CONFIG_PERF_EVENTS=y" >> arch/arm64/configs/vendor/vendor_defconfig
+          echo "CONFIG_HW_PERF_EVENTS=y" >> arch/arm64/configs/vendor/vendor_defconfig
+          
           # 2.1 生成基础 .config
           make ARCH=arm64 LLVM=1 LLVM_IAS=1 CC=clang KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- O="${OUT_DIR}" "${DEFCONFIG_TARGET}"
 

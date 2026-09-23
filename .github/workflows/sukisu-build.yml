@@ -51,6 +51,24 @@ jobs:
           echo "========================================"
           bash /tmp/SukiSU-Ultra/kernel/setup.sh
 
+          # 替换 pkg_observer.c 为 5.4 存根（使用 -L 参数穿透 setup.sh 创建的软链接）
+          PKG_OBS=$(find -L drivers/kernelsu -name "pkg_observer.c" 2>/devnull | head -n 1 || true)
+          if [ -z "$PKG_OBS" ] && [ -f "KernelSU/kernel/manager/pkg_observer.c" ]; then
+            PKG_OBS="KernelSU/kernel/manager/pkg_observer.c"
+          fi
+
+          if [ -n "$PKG_OBS" ] && [ -f "$PKG_OBS" ]; then
+            echo "[+] 成功定位 $PKG_OBS ，正在替换为 5.4 兼容存根"
+            cat << 'EOF' > "$PKG_OBS"
+          // SPDX-License-Identifier: GPL-2.0
+          #include <linux/module.h>
+          int ksu_observer_init(void) { return 0; }
+          void ksu_observer_exit(void) {}
+          EOF
+          else
+            echo "[-] 警告: 未能找到 pkg_observer.c，请检查路径！"
+          fi
+
           echo "========================================"
           echo "4. 配置 Linux 5.4 全局 C 语法兼容头文件"
           echo "========================================"

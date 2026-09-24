@@ -167,6 +167,7 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_MBOX
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
@@ -175,14 +176,18 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DMA_SHARED_BUFFER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DRM_MSM_COOLING_DEV
 
+            # --- 5. OPlus 与高通底层驱动与共享内存完整依赖链 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_LOG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_SYSTEM_KERNEL
+
             # --- 5. 设置数值型变量 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --set-val CONFIG_IOMMU_IOVA_ALIGNMENT 9
 
-            # --- 6. 禁用有冲突/报错的无关外设 ---
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_HID_QVR
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_MSM_RDBG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_IOMMU_DEBUG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_IOMMU_DEBUGFS
+            # --- 6. 有冲突/报错的无关外设 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HID_QVR
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MSM_RDBG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUGFS
           fi      
 
           # 统一刷新 olddefconfig，一次性生成编译所需的 autoconf.h

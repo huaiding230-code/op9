@@ -122,7 +122,7 @@ jobs:
           if [ -f "${CONFIG_TOOL}" ]; then
             chmod +x "${CONFIG_TOOL}"
             
-            # --- 基础网络与核心功能 ---
+            # --- 1. 基础网络与核心功能 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NET
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_INET
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPS
@@ -130,7 +130,7 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HW_PERF_EVENTS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KEYS
             
-            # --- SukiSU & SUSFS 隐匿与功能配置 ---
+            # --- 2. SukiSU & SUSFS 隐匿与功能配置 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_SUS_PATH
@@ -147,33 +147,36 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SPOOF_CPU
             
-            # --- 高通 QTI 硬件加密与存储配置 ---
+            # --- 3. 高通 QTI 硬件加密与存储完整依赖链 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_MEMNEQ
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_DEV_QCOM_ICE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_CRYPTO_COMMON
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_CRYPTO_TZ
 
-            # --- CPU 频率与高通/OPLUS 共享内存底层依赖 ---
+            # --- 4. CPU 频率与高通/OPLUS 共享内存底层完整依赖链 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_IDLE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_COMMON
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_ARCH_QCOM
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QRTR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_QMI_HELPERS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DMA_SHARED_BUFFER
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_ARCH_QCOM
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
 
-            # --- 设置数值型变量 ---
+            # --- 5. 设置数值型变量 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --set-val CONFIG_IOMMU_IOVA_ALIGNMENT 9
 
-            # --- 禁用有冲突/报错的无关外设 ---
+            # --- 6. 禁用有冲突/报错的无关外设 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_HID_QVR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_MSM_RDBG
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_KSU_SELINUX_HIDE
@@ -181,14 +184,9 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_IOMMU_DEBUGFS
           fi      
 
-          # 刷新 olddefconfig 解析新增依赖
+          # 统一刷新 olddefconfig，一次性生成编译所需的 autoconf.h
           make "${MAKE_ARGS[@]}" olddefconfig
-
-          # 锁定关键底驱动为静态内置 (=y)，防止被 olddefconfig 降级为模块 (=m)
-          "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
-          "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
-          "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
-          "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_LIB_MEMNEQ
+          
           echo "========================================"
           echo "4. 核心配置依赖性强校验"
           echo "========================================"

@@ -5,10 +5,6 @@
 #ifndef __ASM_PGTABLE_H
 #define __ASM_PGTABLE_H
 
-/* 提前声明，防止 Clang 报不完整定义错误 */
-struct mm_struct;
-struct task_struct;
-
 #include <asm/bug.h>
 #include <asm/proc-fns.h>
 

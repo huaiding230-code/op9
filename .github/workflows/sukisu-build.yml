@@ -283,5 +283,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AnyKernel3_SukiSU_SUSFS_lemonadep
-          path: AnyKernel3-OnePlus9Pro-SukiSU.zip
-          if-no-files-found: error
+          path: AnyKernel3/

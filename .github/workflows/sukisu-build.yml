@@ -20,12 +20,6 @@ jobs:
           path: kernel_source
           fetch-depth: 1
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ runner.os }}-kernel-ccache
-          max-size: 10G
-
       - name: Setup Proton-Clang Toolchain
         run: |
           mkdir -p toolchain
@@ -82,9 +76,7 @@ jobs:
           fi
 
       - name: Build Integrated Kernel
-        env:
-          CC: "ccache clang"
-          CXX: "ccache clang++"
+        
         run: |
           set -euo pipefail
           cd kernel_source
@@ -116,7 +108,7 @@ jobs:
             LLVM=1
             LLVM_IAS=1
             CC=clang
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
             O="${OUT_DIR}"

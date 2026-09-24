@@ -185,9 +185,7 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_IDLE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_COMMON
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DEBUG_FS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_SUPPORT
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MSM_RDBG
 
             # --- 7. 设置数值型变量 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --set-val CONFIG_IOMMU_IOVA_ALIGNMENT 9

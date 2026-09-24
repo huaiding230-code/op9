@@ -7,7 +7,6 @@
  * functionality:
  */
 
-#include <linux/sched.h>
 #include <linux/uaccess.h>
 
 struct task_struct;

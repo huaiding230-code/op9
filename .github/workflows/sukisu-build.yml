@@ -148,7 +148,23 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SPOOF_CPU
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SELINUX_HIDE
             
-            # --- 3. 高通 QTI 硬件加密与存储完整依赖链 ---
+            # --- 3. 高通 QTI 核心平台、SoC与共享内存底层完整依赖链 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_ARCH_QCOM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SOCINFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_COMMAND_DB
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_RPMH
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_RPMHPD
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_MBOX
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QRTR
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_QMI_HELPERS
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HWSPINLOCK
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HWSPINLOCK_QCOM
+
+            # --- 4. 高通 QTI 加密、存储与 DMA ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MEDIA_CONTROLLER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_BLK_INLINE_ENCRYPTION
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO
@@ -157,38 +173,29 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CRYPTO_DEV_QCOM_ICE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_CRYPTO_COMMON
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_CRYPTO_TZ
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUG
-
-            # --- 4. CPU 频率与高通/OPLUS 共享内存底层完整依赖链 ---
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_IDLE
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_COMMON
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_ARCH_QCOM
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_RPMSG_CHAR
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_STATE
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_SMEM_MBOX
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QRTR
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QCOM_QMI_HELPERS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DMA_SHARED_BUFFER
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DRM_MSM_COOLING_DEV
 
-            # --- 5. OPlus 与高通底层驱动与共享内存完整依赖链 ---
+            # --- 5. OPlus 专有驱动与机型识别完整依赖链 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_LOG
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_SYSTEM_KERNEL
 
-            # --- 5. 设置数值型变量 ---
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --set-val CONFIG_IOMMU_IOVA_ALIGNMENT 9
-
-            # --- 6. 有冲突/报错的无关外设 ---
+            # --- 6. 调试系统、IOMMU 与 CPU 调频 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_IDLE
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_NO_HZ_COMMON
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DEBUG_FS
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_SUPPORT
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUG
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUGFS
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HID_QVR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MSM_RDBG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUGFS
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DEBUG_FS
+
+            # --- 7. 设置数值型变量 ---
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --set-val CONFIG_IOMMU_IOVA_ALIGNMENT 9
             
           fi      
 

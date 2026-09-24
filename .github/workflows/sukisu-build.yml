@@ -43,6 +43,8 @@ jobs:
           echo "2. 清理 dts 设备树冲突节点"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
+          # 强制把行首的 8 个空格替换为 Tab (\t)
+          sed -i 's/^ \{8\}/\t/g' arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
           
           echo "========================================"
           echo "3. 执行你魔改过的 setup.sh (全权交由你的库处理)"
@@ -161,21 +163,28 @@ jobs:
           echo "========================================"
           make "${MAKE_ARGS[@]}" -j$(nproc)
         
-          echo "========================================"
-          echo "4. 检查构建产物"
-          echo "========================================"
-          if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
-            echo "SUCCESS: 纯内核编译成功！产物: Image.gz-dtb"
-          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ] || [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
-            echo "SUCCESS: 纯内核编译成功！"
-          else
-            echo "ERROR: 未在产物目录找到内核镜像"
-            exit 1
-          fi
-      - name: Upload Pure Kernel Artifacts
+      - name: Pack with AnyKernel3
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
+          cd AnyKernel3
+          # 移除旧的无用配置
+          rm -rf .git
+          
+          # 修改 AnyKernel3 的配置适配你的机型 (OnePlus 9 Pro - lemonadep)
+          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+          sed -i 's/block=auto/block=\/dev\/block\/bootdevice\/by-name\/boot/g' anykernel.sh
+          
+          # 将编译好的内核塞进 AK3 目录
+          cp ${GITHUB_WORKSPACE}/out/arch/arm64/boot/Image AnyKernel3/
+          
+          # 如果你的机器需要 dtb
+          # cp ${GITHUB_WORKSPACE}/out/arch/arm64/boot/dtb AnyKernel3/dtb
+          
+          zip -r9 ../AnyKernel3-OnePlus9Pro-SukiSU.zip *
+          
+      - name: Upload AnyKernel3 Zip
         uses: actions/upload-artifact@v4
         with:
-          name: blu_spark_SukiSU_SUSFS_lemonadep
-          path: |
-            out/arch/arm64/boot/Image*
-            out/arch/arm64/boot/dtb*
+          name: AnyKernel3_SukiSU_SUSFS_lemonadep
+          path: AnyKernel3-OnePlus9Pro-SukiSU.zip

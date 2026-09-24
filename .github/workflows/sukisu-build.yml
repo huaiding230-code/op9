@@ -71,17 +71,23 @@ jobs:
       - name: Cache Ccache
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
+          path: ${{ github.workspace }}/.ccache
           key: ccache-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ runner.os }}-
-
+  
       - name: Build Integrated Kernel
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_MAXSIZE: 10G
+          CCACHE_COMPRESS: 1
         run: |
           set -euo pipefail
 
-          # 1. 安装 ccache 工具
+          # 1. 安装 ccache 工具并创建缓存目录
           sudo apt-get update -y && sudo apt-get install -y ccache
+          mkdir -p "${CCACHE_DIR}"
+          ccache -z # 清空本次统计，开始计数
         
           cd kernel_source
           CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
@@ -168,6 +174,9 @@ jobs:
           echo "5. 执行内核编译"
           echo "========================================"
           make "${MAKE_ARGS[@]}" -j$(nproc)
+
+          # 打印 ccache 命率与状态
+          ccache -s
         
       - name: Package with AnyKernel3
         run: |

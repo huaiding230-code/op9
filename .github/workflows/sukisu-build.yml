@@ -67,27 +67,10 @@ jobs:
           if ! grep -q "CONFIG_KSU_SUSFS" fs/Kconfig; then
             echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
-
-      - name: Cache Ccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            ccache-${{ runner.os }}-
-  
+          
       - name: Build Integrated Kernel
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
-          CCACHE_MAXSIZE: 10G
-          CCACHE_COMPRESS: 1
         run: |
           set -euo pipefail
-
-          # 1. 安装 ccache 工具并创建缓存目录
-          sudo apt-get update -y && sudo apt-get install -y ccache
-          mkdir -p "${CCACHE_DIR}"
-          ccache -z # 清空本次统计，开始计数
         
           cd kernel_source
           CLANG_DIR="${GITHUB_WORKSPACE}/toolchain/proton-clang"
@@ -117,7 +100,7 @@ jobs:
             ARCH=arm64
             LLVM=1
             LLVM_IAS=1
-            CC="ccache clang"
+            CC=clang
             KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function"
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-

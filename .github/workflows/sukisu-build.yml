@@ -67,14 +67,6 @@ jobs:
             echo -e '\nconfig KSU_SUSFS\n\tbool "SUSFS support"\n\tdefault y\n' >> fs/Kconfig
           fi
 
-      - name: Cache Ccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          key: ccache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            ccache-${{ runner.os }}-    
-
       - name: Build Integrated Kernel
         run: |
           set -euo pipefail
@@ -106,7 +98,7 @@ jobs:
             ARCH=arm64
             LLVM=1
             LLVM_IAS=1
-            CC="ccache clang"
+            CC=clang
             KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-

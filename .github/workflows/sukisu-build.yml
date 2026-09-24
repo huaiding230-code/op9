@@ -42,10 +42,7 @@ jobs:
           echo "2. 清理 dts 设备树冲突节点"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
-          if [ -f "arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile" ]; then
-            echo "obj-y :=" > arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
-          fi
-
+          
           echo "========================================"
           echo "3. 执行你魔改过的 setup.sh (全权交由你的库处理)"
           echo "========================================"
@@ -61,12 +58,6 @@ jobs:
             echo "[-] 错误: 未找到 susfs.c" && exit 1
           fi
           find /tmp/susfs4ksu -name "susfs*.h" -exec cp {} include/linux/ \;
-
-          if [ -f "patch/50_add_susfs_in_kernel-5.4.patch" ]; then
-            patch -p1 --batch -N --fuzz=3 --ignore-whitespace < patch/50_add_susfs_in_kernel-5.4.patch || true
-          else
-            echo "[-] 错误: 未找到 50_add_susfs_in_kernel-5.4.patch！" && exit 1
-          fi
 
           if ! grep -q "susfs.o" fs/Makefile; then
             echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
@@ -181,8 +172,6 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_KERNEL
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_LOG
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_SYSTEM_KERNEL
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_PROJECT_INFO
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_OPLUS_FEATURE_PROJECT_INFO
 
             # --- 6. 调试系统、IOMMU 与 CPU 调频 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_CPU_FREQ

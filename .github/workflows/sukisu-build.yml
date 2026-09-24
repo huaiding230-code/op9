@@ -179,7 +179,6 @@ jobs:
             # --- 6. 禁用有冲突/报错的无关外设 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_HID_QVR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_MSM_RDBG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_KSU_SELINUX_HIDE
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_IOMMU_DEBUG
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --disable CONFIG_IOMMU_DEBUGFS
           fi      

@@ -31,6 +31,10 @@
 #include "cam_cpas_hw.h"
 #include "cam_trace.h"
 
+#ifndef CONFIG_MEDIA_CONTROLLER
+#define CONFIG_MEDIA_CONTROLLER 1
+#endif
+
 #define CAM_REQ_MGR_EVENT_MAX 1024
 
 static struct cam_req_mgr_device g_dev;

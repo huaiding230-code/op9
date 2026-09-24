@@ -187,8 +187,9 @@ jobs:
             # --- 6. 有冲突/报错的无关外设 ---
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_HID_QVR
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_MSM_RDBG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUG
-            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUG_FS
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_IOMMU_DEBUGFS
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_DEBUG_FS
+            
           fi      
 
           # 统一刷新 olddefconfig，一次性生成编译所需的 autoconf.h

@@ -108,7 +108,7 @@ jobs:
             LLVM=1
             LLVM_IAS=1
             CC=clang
-            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function"
+            KCFLAGS="-Wno-error -Wno-return-type -Wno-unused-function -Wno-implicit-function-declaration -Wno-int-conversion"
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
             O="${OUT_DIR}"
@@ -236,16 +236,44 @@ jobs:
             exit 1
           fi
 
+      - name: 打包刷机包
+        run: |
           echo "========================================"
           echo "3. 打包刷机包"
           echo "========================================"
-          cd AnyKernel3
-          zip -r9 "../blu_spark_SukiSU_SUSFS_lemonadep.zip" * -x .git README.md
-          test -f "../blu_spark_SukiSU_SUSFS_lemonadep.zip"
-          echo "SUCCESS: 打包完成！"
+          
+          # 1. 检查 AnyKernel3 目录是否存在
+          if [ ! -d "AnyKernel3" ]; then
+            echo "ERROR: 未找到 AnyKernel3 目录！"
+            exit 1
+          fi
 
-      - name: Upload Integrated Kernel Zip Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: blu_spark_SukiSU_SUSFS_lemonadep
-          path: blu_spark_SukiSU_SUSFS_lemonadep.zip
+          # 2. 核心补全：将编译产物 (Image / Image.lz4 / dtb) 复制进 AnyKernel3
+          OUT_DIR="${GITHUB_WORKSPACE}/out"
+          if [ -f "${OUT_DIR}/arch/arm64/boot/Image.lz4" ]; then
+            echo "发现 Image.lz4，正在复制到 AnyKernel3..."
+            cp "${OUT_DIR}/arch/arm64/boot/Image.lz4" AnyKernel3/
+          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
+            echo "发现 Image，正在复制到 AnyKernel3..."
+            cp "${OUT_DIR}/arch/arm64/boot/Image" AnyKernel3/
+          else
+            echo "ERROR: out 目录下未找到任何内核镜像 (Image 或 Image.lz4)！编译可能已失败。"
+            exit 1
+          fi
+
+          # 复制 dtb / dtbo (如果有)
+          [ -f "${OUT_DIR}/arch/arm64/boot/dtb" ] && cp "${OUT_DIR}/arch/arm64/boot/dtb" AnyKernel3/
+          [ -f "${OUT_DIR}/arch/arm64/boot/dtbo.img" ] && cp "${OUT_DIR}/arch/arm64/boot/dtbo.img" AnyKernel3/
+
+          # 3. 打包
+          cd AnyKernel3
+          zip -r9 "../blu_spark_SukiSU_SUSFS_lemonadep.zip" * -x ".git*" "README.md"
+          cd ..
+
+          # 4. 校验生成的刷机包
+          if [ -f "blu_spark_SukiSU_SUSFS_lemonadep.zip" ]; then
+            echo "SUCCESS: 刷机包成功生成！大小: $(du -h blu_spark_SukiSU_SUSFS_lemonadep.zip | cut -f1)"
+          else
+            echo "ERROR: 刷机包生成失败！"
+            exit 1
+          fi

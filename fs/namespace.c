@@ -4166,20 +4166,3 @@ const struct proc_ns_operations mntns_operations = {
 	.install	= mntns_install,
 	.owner		= mntns_owner,
 };
-
-/* SUSFS & SukiSU 5.4 Kernel Compatibility Helpers */
-int path_umount(struct path *path, int flags)
-{
-	struct mount *mnt = real_mount(path->mnt);
-	if (path->dentry != path->mnt->mnt_root)
-		return -EINVAL;
-	return do_umount(mnt, flags);
-}
-EXPORT_SYMBOL(path_umount);
-
-int path_mount(const char *dev_name, struct path *path,
-		const char *type_page, unsigned long flags, void *data_page)
-{
-	return do_mount(dev_name, path->dentry->d_name.name, type_page, flags, data_page);
-}
-EXPORT_SYMBOL(path_mount);

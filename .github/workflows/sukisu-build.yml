@@ -223,3 +223,9 @@ jobs:
             echo "ERROR: 刷机包生成失败！"
             exit 1
           fi
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blu_spark_SukiSU_SUSFS_lemonadep
+          path: kernel_source/AnyKernel3/*.zip

@@ -157,9 +157,6 @@ jobs:
           echo "5. 执行内核编译"
           echo "========================================"
           make "${MAKE_ARGS[@]}" -j$(nproc)
-
-          # 打印 ccache 命率与状态
-          ccache -s
         
       - name: Package with AnyKernel3
         run: |

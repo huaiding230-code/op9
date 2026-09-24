@@ -43,6 +43,7 @@ jobs:
           echo "2. 清理 dts 设备树冲突节点"
           echo "========================================"
           git checkout -- arch/arm64/boot/dts/ || true
+          git checkout -- arch/arm64/boot/dts/vendor/oplus/lemonadev/Makefile
           
           echo "========================================"
           echo "3. 执行你魔改过的 setup.sh (全权交由你的库处理)"

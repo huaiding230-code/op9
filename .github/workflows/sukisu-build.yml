@@ -150,6 +150,9 @@ jobs:
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SPOOF_CPU
             "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_KSU_SELINUX_HIDE
+
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_HW_KEY_MANAGER
+            "${CONFIG_TOOL}" --file "${OUT_DIR}/.config" --enable CONFIG_QTI_CRYPTO_TZ
           fi
 
           # 统一刷新 olddefconfig，一次性生成编译所需的 autoconf.h

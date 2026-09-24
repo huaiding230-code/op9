@@ -26,6 +26,10 @@
 #define BYTE_ORDER_VAL			8
 #define KEY_WRAPPED_SIZE		68
 
+#define crypto_qti_program_key hwkm_crypto_qti_program_key
+#define crypto_qti_invalidate_key hwkm_crypto_qti_invalidate_key
+#define crypto_qti_derive_raw_secret_platform hwkm_crypto_qti_derive_raw_secret_platform
+
 union crypto_cfg {
 	__le32 regval[2];
 	struct {

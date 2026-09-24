@@ -164,27 +164,124 @@ jobs:
           make "${MAKE_ARGS[@]}" -j$(nproc)
         
       - name: Pack with AnyKernel3
+        shell: bash
         run: |
-          cd ${GITHUB_WORKSPACE}
-          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
+          set -e
+
+          cd "${GITHUB_WORKSPACE}"
+
+          # 下载 AnyKernel3
+          git clone --depth=1 \
+            https://github.com/osm0sis/AnyKernel3.git \
+            AnyKernel3
+
           cd AnyKernel3
-          # 移除旧的无用配置
+
+          # 移除 Git 信息
           rm -rf .git
-          
-          # 修改 AnyKernel3 的配置适配你的机型 (OnePlus 9 Pro - lemonadep)
-          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
-          sed -i 's/block=auto/block=\/dev\/block\/bootdevice\/by-name\/boot/g' anykernel.sh
-          
-          # 将编译好的内核塞进 AK3 目录
-          cp ${GITHUB_WORKSPACE}/out/arch/arm64/boot/Image AnyKernel3/
-          
-          # 如果你的机器需要 dtb
-          # cp ${GITHUB_WORKSPACE}/out/arch/arm64/boot/dtb AnyKernel3/dtb
-          
-          zip -r9 ../AnyKernel3-OnePlus9Pro-SukiSU.zip *
-          
+
+          # 关闭设备检查
+          sed -i -E \
+            's/^[[:space:]]*do\.devicecheck=.*/do.devicecheck=0/' \
+            anykernel.sh
+
+          # OnePlus 9 Pro 为 A/B 设备
+          # 同时兼容 BLOCK/block 和 IS_SLOT_DEVICE/is_slot_device 写法
+          sed -i -E \
+            's/^[[:space:]]*(BLOCK|block)=.*/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot;/' \
+            anykernel.sh
+
+          sed -i -E \
+            's/^[[:space:]]*(IS_SLOT_DEVICE|is_slot_device)=.*/IS_SLOT_DEVICE=1;/' \
+            anykernel.sh
+
+          # 查找编译生成的内核文件
+          KERNEL_DIR="${GITHUB_WORKSPACE}/out/arch/arm64/boot"
+          KERNEL_FILE=""
+
+          # 优先使用包含 DTB 的内核文件
+          if [ -s "${KERNEL_DIR}/Image.gz-dtb" ]; then
+            KERNEL_FILE="${KERNEL_DIR}/Image.gz-dtb"
+          elif [ -s "${KERNEL_DIR}/Image-dtb" ]; then
+            KERNEL_FILE="${KERNEL_DIR}/Image-dtb"
+          elif [ -s "${KERNEL_DIR}/Image.gz" ]; then
+            KERNEL_FILE="${KERNEL_DIR}/Image.gz"
+          elif [ -s "${KERNEL_DIR}/Image" ]; then
+            KERNEL_FILE="${KERNEL_DIR}/Image"
+          fi
+
+          # 如果没有找到任何支持的内核文件，则终止任务
+          if [ -z "${KERNEL_FILE}" ]; then
+            echo "错误：没有找到可用的内核文件"
+            echo "当前 boot 输出目录内容："
+            ls -lah "${KERNEL_DIR}"
+            exit 1
+          fi
+
+          echo "检测到的内核文件：${KERNEL_FILE}"
+
+          # 将内核文件复制到 AnyKernel3 根目录，并保留原文件名
+          cp -v "${KERNEL_FILE}" .
+
+          # 如果存在单独的 DTB，则复制到 ZIP 根目录
+          if [ -s "${KERNEL_DIR}/dtb" ]; then
+            echo "检测到单独的 dtb 文件，正在复制"
+            cp -v "${KERNEL_DIR}/dtb" .
+          fi
+
+          # 如果存在 dtbo.img，则一并复制
+          if [ -s "${KERNEL_DIR}/dtbo.img" ]; then
+            echo "检测到 dtbo.img，正在复制"
+            cp -v "${KERNEL_DIR}/dtbo.img" .
+          fi
+
+          # 查找并复制内核模块
+          MODULE_COUNT=$(
+            find "${GITHUB_WORKSPACE}/out" \
+              -type f \
+              -name "*.ko" \
+              | wc -l
+          )
+
+          if [ "${MODULE_COUNT}" -gt 0 ]; then
+            echo "检测到 ${MODULE_COUNT} 个内核模块"
+
+            mkdir -p modules/system/lib/modules
+
+            find "${GITHUB_WORKSPACE}/out" \
+              -type f \
+              -name "*.ko" \
+              -exec cp -v {} modules/system/lib/modules/ \;
+          else
+            echo "没有检测到内核模块，跳过模块打包"
+          fi
+
+          # 返回工作区根目录
+          cd "${GITHUB_WORKSPACE}"
+
+          # 打包 AnyKernel3
+          # LICENSE 会被保留，README 和占位文件不会被打包
+          zip -r9 \
+            "AnyKernel3-OnePlus9Pro-SukiSU.zip" \
+            AnyKernel3 \
+            -x "AnyKernel3/README.md" \
+            -x "AnyKernel3/*placeholder" \
+            -x "AnyKernel3/.git/*"
+
+          # 检查 ZIP 是否成功生成
+          test -s \
+            "AnyKernel3-OnePlus9Pro-SukiSU.zip"
+
+          echo "AnyKernel3 ZIP 已生成："
+          ls -lh "AnyKernel3-OnePlus9Pro-SukiSU.zip"
+
+          echo "ZIP 内容："
+          unzip -l "AnyKernel3-OnePlus9Pro-SukiSU.zip"
+
+
       - name: Upload AnyKernel3 Zip
         uses: actions/upload-artifact@v4
         with:
           name: AnyKernel3_SukiSU_SUSFS_lemonadep
           path: AnyKernel3-OnePlus9Pro-SukiSU.zip
+          if-no-files-found: error

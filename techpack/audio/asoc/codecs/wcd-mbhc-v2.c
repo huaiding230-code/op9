@@ -1824,7 +1824,7 @@ static int wcd_mbhc_set_keycode(struct wcd_mbhc *mbhc)
 				return result;
 			}
 			input_set_capability(
-				mbhc->button_jack.jack->input_dev,
+				NULL,
 				EV_KEY, btn_key_code[i]);
 			pr_debug("%s: set btn%d key code:%d\n", __func__,
 				i, btn_key_code[i]);

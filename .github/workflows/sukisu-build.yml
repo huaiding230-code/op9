@@ -107,7 +107,12 @@ jobs:
             O="${OUT_DIR}"
           )
   
+          # 在每次开始编译前，先把旧的输出目录彻底清空！
+          rm -rf "${OUT_DIR}"
+          
+          # 然后再开始配置和编译
           make "${MAKE_ARGS[@]}" "${DEFCONFIG_TARGET}"
+          make "${MAKE_ARGS[@]}" -j$(nproc)
   
           echo "========================================"
           echo "3. 注入 SukiSU/SUSFS 及其核心依赖 Config"

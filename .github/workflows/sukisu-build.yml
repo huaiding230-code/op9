@@ -163,71 +163,21 @@ jobs:
           echo "========================================"
           make "${MAKE_ARGS[@]}" -j$(nproc)
         
-      - name: Package with AnyKernel3
-        run: |
-          set -euo pipefail
-  
           echo "========================================"
-          echo "1. 克隆 AnyKernel3 模版"
+          echo "4. 检查构建产物"
           echo "========================================"
-          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
-          rm -rf AnyKernel3/.git AnyKernel3/README.md
-  
-          echo "========================================"
-          echo "2. 提取编译产物 (内核镜像 / DTB / DTBO)"
-          echo "========================================"
-          OUT_BOOT="${GITHUB_WORKSPACE}/out/arch/arm64/boot"
-  
-          # 提取内核主镜像
-          if [ -f "${OUT_BOOT}/Image.gz-dtb" ]; then
-            cp "${OUT_BOOT}/Image.gz-dtb" AnyKernel3/
-            echo "[+] 已提取 Image.gz-dtb"
-          elif [ -f "${OUT_BOOT}/Image.gz" ]; then
-            cp "${OUT_BOOT}/Image.gz" AnyKernel3/
-            echo "[+] 已提取 Image.gz"
-          elif [ -f "${OUT_BOOT}/Image" ]; then
-            cp "${OUT_BOOT}/Image" AnyKernel3/
-            echo "[+] 已提取 Image"
+          if [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" ]; then
+            echo "SUCCESS: 纯内核编译成功！产物: Image.gz-dtb"
+          elif [ -f "${OUT_DIR}/arch/arm64/boot/Image.gz" ] || [ -f "${OUT_DIR}/arch/arm64/boot/Image" ]; then
+            echo "SUCCESS: 纯内核编译成功！"
           else
-            echo "ERROR: 未找到任何有效的内核镜像文件！"
+            echo "ERROR: 未在产物目录找到内核镜像"
             exit 1
           fi
-  
-          # 独立提取 DTB 设备树
-          if [ -f "${OUT_BOOT}/dtb" ]; then
-            cp "${OUT_BOOT}/dtb" AnyKernel3/
-            echo "[+] 已提取 dtb"
-          elif [ -f "${OUT_BOOT}/dtb.img" ]; then
-            cp "${OUT_BOOT}/dtb.img" AnyKernel3/dtb
-            echo "[+] 已提取 dtb.img"
-          fi
-  
-          # 提取 DTBO (若存在)
-          if [ -f "${OUT_BOOT}/dtbo.img" ]; then
-            cp "${OUT_BOOT}/dtbo.img" AnyKernel3/
-            echo "[+] 已提取 dtbo.img"
-          fi
-  
-          echo "========================================"
-          echo "3. 执行 Zip 打包"
-          echo "========================================"
-          ZIP_NAME="blu_spark_SukiSU_SUSFS_lemonadep.zip"
-          cd AnyKernel3
-          zip -r9 "../${ZIP_NAME}" * -x ".git*" "README.md"
-          cd ..
-  
-          echo "========================================"
-          echo "4. 校验生成的刷机包"
-          echo "========================================"
-          if [ -f "${ZIP_NAME}" ]; then
-            echo "SUCCESS: 刷机包成功生成！大小: $(du -h "${ZIP_NAME}" | cut -f1)"
-          else
-            echo "ERROR: 刷机包生成失败！"
-            exit 1
-          fi
-
-      - name: Upload Kernel Artifact
+      - name: Upload Pure Kernel Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: blu_spark_SukiSU_SUSFS_lemonadep
-          path: kernel_source/AnyKernel3/*.zip
+          path: |
+            out/arch/arm64/boot/Image*
+            out/arch/arm64/boot/dtb*

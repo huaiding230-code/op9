@@ -161,7 +161,8 @@ jobs:
           echo "========================================"
           echo "5. 执行内核编译"
           echo "========================================"
-          make "${MAKE_ARGS[@]}" Image.gz dtbs -j$(nproc)
+          # 必须同时指定 Image.gz、dtbs 和 modules，缺一不可！
+          make "${MAKE_ARGS[@]}" Image.gz dtbs modules -j$(nproc)
 
           # 自动合并 Image.gz 与 dtb 为 Image.gz-dtb
           KERNEL_OUT="${OUT_DIR}/arch/arm64/boot"

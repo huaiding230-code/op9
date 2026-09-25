@@ -161,106 +161,50 @@ jobs:
           echo "========================================"
           echo "5. 执行内核编译"
           echo "========================================"
-          # 必须同时指定 Image.gz、dtbs 和 modules，缺一不可！
-          make "${MAKE_ARGS[@]}" Image.gz dtbs modules -j$(nproc)
+          
+          make "${MAKE_ARGS[@]}" -j$(nproc)
 
-          # 自动合并 Image.gz 与 dtb 为 Image.gz-dtb
-          KERNEL_OUT="${OUT_DIR}/arch/arm64/boot"
-          DTB_FILE=$(find "${KERNEL_OUT}/dts" -name "*.dtb" 2>/dev/null | head -n 1 || true)
-          if [ -f "${KERNEL_OUT}/Image.gz" ] && [ -n "${DTB_FILE}" ]; then
-            cat "${KERNEL_OUT}/Image.gz" "${DTB_FILE}" > "${KERNEL_OUT}/Image.gz-dtb"
-            echo "[+] Successfully created Image.gz-dtb"
-          fi
-        
       - name: Pack with AnyKernel3
         shell: bash
         run: |
           set -e
-
           cd "${GITHUB_WORKSPACE}"
-
-          # 下载 AnyKernel3
-          git clone --depth=1 \
-            https://github.com/huaiding230-code/AnyKernel3.git \
-            AnyKernel3
-
+          
+          # 1. 下载 AnyKernel3
+          git clone --depth=1 https://github.com/huaiding230-code/AnyKernel3.git AnyKernel3
+          
+          # 2. 进入目录并修改脚本配置
           cd AnyKernel3
-
-          # 移除 Git 信息
-          rm -rf .git
-
-          # 关闭设备检查
-          sed -i -E \
-            's/^[[:space:]]*do\.devicecheck=.*/do.devicecheck=0/' \
-            anykernel.sh
-
-          # OnePlus 9 Pro 为 A/B 设备
-          # 同时兼容 BLOCK/block 和 IS_SLOT_DEVICE/is_slot_device 写法
-          sed -i -E \
-            's/^[[:space:]]*(BLOCK|block)=.*/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot;/' \
-            anykernel.sh
-
-          sed -i -E \
-            's/^[[:space:]]*(IS_SLOT_DEVICE|is_slot_device)=.*/IS_SLOT_DEVICE=1;/' \
-            anykernel.sh
-
-          # 查找编译生成的内核文件
-          KERNEL_DIR="${GITHUB_WORKSPACE}/out/arch/arm64/boot"
-          KERNEL_FILE=""
-
-          # 优先使用包含 DTB 的内核文件
-          if [ -s "${KERNEL_DIR}/Image.gz-dtb" ]; then
-            KERNEL_FILE="${KERNEL_DIR}/Image.gz-dtb"
-          elif [ -s "${KERNEL_DIR}/Image-dtb" ]; then
-            KERNEL_FILE="${KERNEL_DIR}/Image-dtb"
-          elif [ -s "${KERNEL_DIR}/Image.gz" ]; then
-            KERNEL_FILE="${KERNEL_DIR}/Image.gz"
-          elif [ -s "${KERNEL_DIR}/Image" ]; then
-            KERNEL_FILE="${KERNEL_DIR}/Image"
-          fi
-
-          # 如果没有找到任何支持的内核文件，则终止任务
-          if [ -z "${KERNEL_FILE}" ]; then
-            echo "错误：没有找到可用的内核文件"
-            echo "当前 boot 输出目录内容："
-            ls -lah "${KERNEL_DIR}"
+          rm -rf .git README.md *placeholder
+          sed -i -E 's/^[[:space:]]*do\.devicecheck=.*/do.devicecheck=0/' anykernel.sh
+          sed -i -E 's/^[[:space:]]*(BLOCK|block)=.*/BLOCK=\/dev\/block\/bootdevice\/by-name\/boot;/' anykernel.sh
+          sed -i -E 's/^[[:space:]]*(IS_SLOT_DEVICE|is_slot_device)=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
+          
+          # 3. 提取纯净的原生裸 Image (一加9/888专属)
+          KERNEL_IMAGE="${GITHUB_WORKSPACE}/out/arch/arm64/boot/Image"
+          if [ -f "${KERNEL_IMAGE}" ]; then
+            cp "${KERNEL_IMAGE}" ./
+            echo "[+] 成功提取纯净 Image 内核"
+          else
+            echo "[-] 致命错误：没有找到编译好的 Image！"
             exit 1
           fi
-
-          echo "检测到的内核文件：${KERNEL_FILE}"
-
-          # 将内核文件复制到 AnyKernel3 根目录，并保留原文件名
-          cp -v "${KERNEL_FILE}" .
-
-          # 如果存在单独的 DTB，则复制到 ZIP 根目录
-          if [ -s "${KERNEL_DIR}/dtb" ]; then
-            echo "检测到单独的 dtb 文件，正在复制"
-            cp -v "${KERNEL_DIR}/dtb" .
+          
+          # 4. 提取内核模块并放对位置
+          MODULE_COUNT=$(find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" | wc -l)
+          if [ "${MODULE_COUNT}" -gt 0 ]; then
+            echo "检测到 ${MODULE_COUNT} 个内核模块"
+            # 必须放在 AnyKernel3 目录内部，Actions 才能打包到它！
+            mkdir -p modules/vendor/lib/modules
+            find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" -exec cp -v {} modules/vendor/lib/modules/ \;
+          else
+            echo "[-] 警告：没有检测到内核模块"
           fi
-
-          # 如果存在 dtbo.img，则一并复制
-          if [ -s "${KERNEL_DIR}/dtbo.img" ]; then
-            echo "检测到 dtbo.img，正在复制"
-            cp -v "${KERNEL_DIR}/dtbo.img" .
-          fi
-
-          # 查找并复制内核模块（修改为 vendor 路径！）
-              MODULE_COUNT=$(find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" | wc -l)
-              if [ "${MODULE_COUNT}" -gt 0 ]; then
-                echo "检测到 ${MODULE_COUNT} 个内核模块"
-                mkdir -p modules/vendor/lib/modules
-                find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" -exec cp -v {} modules/vendor/lib/modules/ \;
-              else
-                echo "没有检测到内核模块，跳过模块打包"
-              fi
-              
-              cd "${GITHUB_WORKSPACE}"
-              rm -f AnyKernel3/README.md AnyKernel3/*placeholder
-              rm -rf AnyKernel3/.git
-              echo "[+] AnyKernel3 目录结构准备完毕，等待 Actions 自动上传打包"
-
-      - name: Upload AnyKernel3 Zip
+          
+          echo "[+] AnyKernel3 目录结构准备完毕，等待 Actions 自动上传"
+  
+      - name: Upload AnyKernel3 Build
         uses: actions/upload-artifact@v4
         with:
-          name: AnyKernel3_SukiSU_SUSFS_lemonadep
-          path: AnyKernel3/
+          name: AnyKernel3-OnePlus9-SukiSU
+          path: AnyKernel3/*

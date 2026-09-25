@@ -104,6 +104,7 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
             O="${OUT_DIR}"
+            LOCALVERSION="-Raiden-Ei"
           )
   
           # 在每次开始编译前，先把旧的输出目录彻底清空！

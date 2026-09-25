@@ -161,7 +161,15 @@ jobs:
           echo "========================================"
           echo "5. 执行内核编译"
           echo "========================================"
-          make "${MAKE_ARGS[@]}" -j$(nproc)
+          make "${MAKE_ARGS[@]}" Image.gz dtbs -j$(nproc)
+
+          # 自动合并 Image.gz 与 dtb 为 Image.gz-dtb
+          KERNEL_OUT="${OUT_DIR}/arch/arm64/boot"
+          DTB_FILE=$(find "${KERNEL_OUT}/dts" -name "*.dtb" 2>/dev/null | head -n 1 || true)
+          if [ -f "${KERNEL_OUT}/Image.gz" ] && [ -n "${DTB_FILE}" ]; then
+            cat "${KERNEL_OUT}/Image.gz" "${DTB_FILE}" > "${KERNEL_OUT}/Image.gz-dtb"
+            echo "[+] Successfully created Image.gz-dtb"
+          fi
         
       - name: Pack with AnyKernel3
         shell: bash
@@ -172,7 +180,7 @@ jobs:
 
           # 下载 AnyKernel3
           git clone --depth=1 \
-            https://github.com/osm0sis/AnyKernel3.git \
+            https://github.com/huaiding230-code/AnyKernel3.git \
             AnyKernel3
 
           cd AnyKernel3
@@ -235,49 +243,20 @@ jobs:
             cp -v "${KERNEL_DIR}/dtbo.img" .
           fi
 
-          # 查找并复制内核模块
-          MODULE_COUNT=$(
-            find "${GITHUB_WORKSPACE}/out" \
-              -type f \
-              -name "*.ko" \
-              | wc -l
-          )
-
-          if [ "${MODULE_COUNT}" -gt 0 ]; then
-            echo "检测到 ${MODULE_COUNT} 个内核模块"
-
-            mkdir -p modules/system/lib/modules
-
-            find "${GITHUB_WORKSPACE}/out" \
-              -type f \
-              -name "*.ko" \
-              -exec cp -v {} modules/system/lib/modules/ \;
-          else
-            echo "没有检测到内核模块，跳过模块打包"
-          fi
-
-          # 返回工作区根目录
-          cd "${GITHUB_WORKSPACE}"
-
-          # 打包 AnyKernel3
-          # LICENSE 会被保留，README 和占位文件不会被打包
-          zip -r9 \
-            "AnyKernel3-OnePlus9Pro-SukiSU.zip" \
-            AnyKernel3 \
-            -x "AnyKernel3/README.md" \
-            -x "AnyKernel3/*placeholder" \
-            -x "AnyKernel3/.git/*"
-
-          # 检查 ZIP 是否成功生成
-          test -s \
-            "AnyKernel3-OnePlus9Pro-SukiSU.zip"
-
-          echo "AnyKernel3 ZIP 已生成："
-          ls -lh "AnyKernel3-OnePlus9Pro-SukiSU.zip"
-
-          echo "ZIP 内容："
-          unzip -l "AnyKernel3-OnePlus9Pro-SukiSU.zip"
-
+          # 查找并复制内核模块（修改为 vendor 路径！）
+              MODULE_COUNT=$(find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" | wc -l)
+              if [ "${MODULE_COUNT}" -gt 0 ]; then
+                echo "检测到 ${MODULE_COUNT} 个内核模块"
+                mkdir -p modules/vendor/lib/modules
+                find "${GITHUB_WORKSPACE}/out" -type f -name "*.ko" -exec cp -v {} modules/vendor/lib/modules/ \;
+              else
+                echo "没有检测到内核模块，跳过模块打包"
+              fi
+              
+              cd "${GITHUB_WORKSPACE}"
+              rm -f AnyKernel3/README.md AnyKernel3/*placeholder
+              rm -rf AnyKernel3/.git
+              echo "[+] AnyKernel3 目录结构准备完毕，等待 Actions 自动上传打包"
 
       - name: Upload AnyKernel3 Zip
         uses: actions/upload-artifact@v4
